@@ -1,0 +1,17 @@
+services:
+  music-downloader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: music_downloader
+    ports:
+      - "8000:8000"
+    volumes:
+      # Volume per i file scaricati (MP3 e MP4) visibili direttamente sul tuo computer
+      - ./downloads:/app/downloads
+      # Volume per il codice sorgente (modifiche e fix applicati all'istante senza dover ricompilare)
+      - ./app:/app/app
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DOWNLOADS_DIR=/app/downloads

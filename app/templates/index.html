@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MusicDownloader - Scarica Musica e Video Open Source</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366f1'><path d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z'/></svg>">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- HEADER & NAVBAR -->
+        <header class="navbar">
+            <div class="nav-container">
+                <div class="brand-logo" onclick="app.showPopular()">
+                    <div class="logo-icon">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                        </svg>
+                    </div>
+                    <div class="brand-text">
+                        <span class="brand-title">MusicDownloader</span>
+                        <span class="brand-badge">Open Source</span>
+                    </div>
+                </div>
+
+                <nav class="nav-links">
+                    <button class="nav-btn active" id="navPopularBtn" onclick="app.showPopular()">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                            <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        <span>Canzoni Popolari</span>
+                    </button>
+                    <button class="nav-btn" id="navFilesBtn" onclick="app.showFiles()">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        <span>I Miei Download</span>
+                        <span class="badge-count" id="filesCountBadge">0</span>
+                    </button>
+                </nav>
+            </div>
+        </header>
+
+        <!-- MAIN SEARCH HERO -->
+        <section class="hero-section">
+            <div class="hero-content">
+                <h1 class="hero-title">Scarica qualsiasi canzone o video in <span class="gradient-text">Massima Qualità</span></h1>
+                <p class="hero-subtitle">Cerca brani da YouTube, YouTube Music o incolla link Spotify/YouTube. 100% Gratuito e Open Source.</p>
+
+                <!-- SEARCH BAR -->
+                <div class="search-box-wrapper">
+                    <div class="search-input-box">
+                        <span class="search-icon">
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                        </span>
+                        <input 
+                            type="text" 
+                            id="searchInput" 
+                            placeholder="Cerca titolo, artista, oppure incolla link YouTube / Spotify..."
+                            autocomplete="off"
+                            onkeydown="if(event.key==='Enter') app.handleSearch()"
+                        />
+                        <button class="clear-btn" id="clearSearchBtn" onclick="app.clearSearch()" style="display:none;">✕</button>
+                        <button class="search-submit-btn" id="searchSubmitBtn" onclick="app.handleSearch()">
+                            <span>Cerca</span>
+                            <div class="spinner" id="searchSpinner" style="display:none;"></div>
+                        </button>
+                    </div>
+
+                    <!-- SEARCH BADGES -->
+                    <div class="search-tags">
+                        <span class="tag-label">💡 Suggerimenti:</span>
+                        <button class="tag-chip" onclick="app.quickSearch('Alfa')">Alfa</button>
+                        <button class="tag-chip" onclick="app.quickSearch('Geolier')">Geolier</button>
+                        <button class="tag-chip" onclick="app.quickSearch('Sfera Ebbasta')">Sfera Ebbasta</button>
+                        <button class="tag-chip" onclick="app.quickSearch('Coldplay')">Coldplay</button>
+                        <button class="tag-chip" onclick="app.quickSearch('The Weeknd')">The Weeknd</button>
+                        <button class="tag-chip" onclick="app.quickSearch('Eminem')">Eminem</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- MAIN CONTAINER -->
+        <main class="main-container">
+
+            <!-- 1. POPULAR SONGS SECTION -->
+            <section id="popularSection" class="view-section">
+                <div class="section-header">
+                    <div>
+                        <h2 class="section-title">🔥 Canzoni Più Popolari</h2>
+                        <p class="section-desc">Classifica dei brani di maggior successo aggiornata in tempo reale</p>
+                    </div>
+
+                    <!-- COUNTRY SELECTOR -->
+                    <div class="country-pills" id="countryPills">
+                        <button class="pill-btn active" data-country="IT" onclick="app.changeCountry('IT')">🇮🇹 Italia</button>
+                        <button class="pill-btn" data-country="ZZ" onclick="app.changeCountry('ZZ')">🌍 Globale</button>
+                        <button class="pill-btn" data-country="US" onclick="app.changeCountry('US')">🇺🇸 USA</button>
+                        <button class="pill-btn" data-country="GB" onclick="app.changeCountry('GB')">🇬🇧 UK</button>
+                        <button class="pill-btn" data-country="ES" onclick="app.changeCountry('ES')">🇪🇸 Spagna</button>
+                    </div>
+                </div>
+
+                <div id="popularLoading" class="loading-state" style="display:none;">
+                    <div class="big-spinner"></div>
+                    <p>Caricamento classifiche in corso...</p>
+                </div>
+
+                <div id="popularGrid" class="cards-grid">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </section>
+
+            <!-- 2. SEARCH RESULTS SECTION -->
+            <section id="searchSection" class="view-section" style="display:none;">
+                <div class="section-header">
+                    <div>
+                        <h2 class="section-title">🔍 Risultati per: <span id="searchQueryLabel" class="highlight-query">""</span></h2>
+                        <p class="section-desc" id="searchCountLabel">Trovate corrispondenze</p>
+                    </div>
+                    <button class="back-link-btn" onclick="app.showPopular()">
+                        ← Torna ai popolari
+                    </button>
+                </div>
+
+                <div id="searchLoading" class="loading-state" style="display:none;">
+                    <div class="big-spinner"></div>
+                    <p>Ricerca corrispondenze in corso su YouTube & YouTube Music...</p>
+                </div>
+
+                <div id="searchResultsGrid" class="cards-grid">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </section>
+
+            <!-- 3. SONG DETAILS SECTION -->
+            <section id="detailsSection" class="view-section" style="display:none;">
+                <div class="details-top-bar">
+                    <button class="back-btn" onclick="app.goBackFromDetails()">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                        <span>Torna all'elenco</span>
+                    </button>
+                </div>
+
+                <div id="detailsLoading" class="loading-state" style="display:none;">
+                    <div class="big-spinner"></div>
+                    <p>Caricamento dettagli e formati di massima qualità...</p>
+                </div>
+
+                <div id="detailsCard" class="details-card-wrapper" style="display:none;">
+                    <!-- HERO DETAILS HEADER -->
+                    <div class="details-hero">
+                        <div class="cover-wrapper">
+                            <img id="detailCover" src="" alt="Copertina brano" class="cover-image" />
+                            <div class="cover-glow" id="detailCoverGlow"></div>
+                        </div>
+
+                        <div class="info-wrapper">
+                            <div class="badge-row">
+                                <span class="format-badge" id="detailTypeBadge">🎵 Canzone HQ</span>
+                                <span class="duration-badge" id="detailDuration">0:00</span>
+                            </div>
+
+                            <h1 class="song-title" id="detailTitle">Titolo Canzone</h1>
+                            <p class="artist-name" id="detailArtist">
+                                <span id="detailArtistName">Nome Artista</span>
+                                <svg class="verified-icon" viewBox="0 0 24 24" width="18" height="18" fill="#6366f1">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                </svg>
+                            </p>
+
+                            <div class="meta-row">
+                                <div class="meta-item" id="metaAlbumWrapper" style="display:none;">
+                                    <span class="meta-label">Album:</span>
+                                    <span class="meta-val" id="detailAlbum">-</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="meta-label">Visualizzazioni:</span>
+                                    <span class="meta-val" id="detailViews">-</span>
+                                </div>
+                                <div class="meta-item" id="metaDateWrapper" style="display:none;">
+                                    <span class="meta-label">Pubblicato il:</span>
+                                    <span class="meta-val" id="detailDate">-</span>
+                                </div>
+                            </div>
+
+                            <!-- PREVIEW PLAYER -->
+                            <div class="preview-player-box">
+                                <div class="preview-header">
+                                    <span>🎧 Anteprima Ascolto</span>
+                                    <button class="toggle-player-btn" id="togglePlayerBtn" onclick="app.togglePreviewPlayer()">
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                        </svg>
+                                        <span>Ascolta Anteprima</span>
+                                    </button>
+                                </div>
+                                <div id="previewEmbedContainer" class="preview-embed-container" style="display:none;">
+                                    <iframe id="previewIframe" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DOWNLOAD ACTION CARDS -->
+                    <div class="download-section">
+                        <h3 class="download-section-heading">⚡ Scarica in Massima Qualità</h3>
+                        <p class="download-section-sub">Tutti i file vengono elaborati con FFmpeg ad altissima fedeltà e salvati automaticamente sul tuo PC.</p>
+
+                        <div class="download-options-grid">
+                            <!-- OPTION 1: MP3 320 KBPS -->
+                            <div class="download-card audio-card">
+                                <div class="card-tag">Massima Fedeltà Audio</div>
+                                <div class="card-icon-header">
+                                    <div class="icon-circle audio-icon">
+                                        <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
+                                            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="card-title">Canzone MP3 (320 kbps)</h4>
+                                        <span class="card-subtitle">Formato universale MP3</span>
+                                    </div>
+                                </div>
+
+                                <ul class="features-list">
+                                    <li>
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                                        Audio estratto a <strong>320 kbps (Massima Qualità)</strong>
+                                    </li>
+                                    <li>
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                                        <strong>Copertina HD incorporata</strong> nel file (ID3 APIC)
+                                    </li>
+                                    <li>
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                                        Tag metadati (Titolo, Artista, Album) pronti per auto/telefono
+                                    </li>
+                                </ul>
+
+                                <button class="download-action-btn audio-btn" id="downloadMp3Btn" onclick="app.startDownload('mp3')">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                    </svg>
+                                    <span>Scarica Canzone MP3 (320 kbps)</span>
+                                </button>
+                            </div>
+
+                            <!-- OPTION 2: VIDEO MP4 -->
+                            <div class="download-card video-card">
+                                <div class="card-tag">Massima Risoluzione Video</div>
+                                <div class="card-icon-header">
+                                    <div class="icon-circle video-icon">
+                                        <svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
+                                            <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="card-title">Filmato Video MP4</h4>
+                                        <span class="card-subtitle" id="detailMaxVideoRes">Massima Qualità (HD / 4K)</span>
+                                    </div>
+                                </div>
+
+                                <ul class="features-list">
+                                    <li>
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                                        Video e Musica sincronizzati alla <strong>massima risoluzione</strong>
+                                    </li>
+                                    <li>
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                                        Formato <strong>MP4 universale</strong> (compatibile con TV, PC, smartphone)
+                                    </li>
+                                    <li>
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                                        Nessuna filigrana o compressione aggiuntiva
+                                    </li>
+                                </ul>
+
+                                <button class="download-action-btn video-btn" id="downloadMp4Btn" onclick="app.startDownload('mp4')">
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2">
+                                        <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                    </svg>
+                                    <span>Scarica Filmato Video (MP4)</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- LIVE DOWNLOAD PROGRESS CARD -->
+                        <div id="downloadProgressBox" class="progress-box" style="display:none;">
+                            <div class="progress-box-header">
+                                <div class="progress-title-row">
+                                    <div class="pulse-dot"></div>
+                                    <h4 id="progressStatusText">Preparazione download...</h4>
+                                </div>
+                                <span class="progress-percent" id="progressPercentText">0%</span>
+                            </div>
+
+                            <div class="progress-bar-track">
+                                <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+                            </div>
+
+                            <div class="progress-meta-row">
+                                <span id="progressSpeedText">Velocità: --</span>
+                                <span id="progressEtaText">Tempo rimanente: --</span>
+                            </div>
+
+                            <!-- SUCCESS BANNER -->
+                            <div id="progressSuccessActions" class="success-actions" style="display:none;">
+                                <div class="success-msg">
+                                    <svg viewBox="0 0 24 24" width="22" height="22" fill="#10b981">
+                                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                                    </svg>
+                                    <span>Download completato con successo!</span>
+                                </div>
+                                <div class="success-buttons">
+                                    <a id="browserDownloadBtn" href="#" class="save-computer-btn">
+                                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                        </svg>
+                                        <span>Scarica subito nel browser</span>
+                                    </a>
+                                    <button class="view-files-link-btn" onclick="app.showFiles()">
+                                        <span>Apri cartella Download dell'app</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. MY DOWNLOADS SECTION -->
+            <section id="filesSection" class="view-section" style="display:none;">
+                <div class="section-header">
+                    <div>
+                        <h2 class="section-title">📂 I Miei Download</h2>
+                        <p class="section-desc">Tutti i brani e i video salvati sul server e sul tuo computer</p>
+                    </div>
+                    <button class="refresh-files-btn" onclick="app.loadFiles()">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                        </svg>
+                        <span>Aggiorna</span>
+                    </button>
+                </div>
+
+                <div id="filesLoading" class="loading-state" style="display:none;">
+                    <div class="big-spinner"></div>
+                    <p>Caricamento file...</p>
+                </div>
+
+                <div id="filesEmpty" class="empty-state" style="display:none;">
+                    <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12 0c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zM9 10l12-3"/>
+                    </svg>
+                    <h3>Nessun file scaricato ancora</h3>
+                    <p>Cerca una canzone o sfoglia i brani popolari per scaricare il tuo primo MP3 o MP4.</p>
+                    <button class="primary-btn" onclick="app.showPopular()">Esplora Canzoni Popolari</button>
+                </div>
+
+                <div id="filesListContainer" class="files-list">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </section>
+        </main>
+
+        <!-- TOAST NOTIFICATIONS -->
+        <div id="toastContainer" class="toast-container"></div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
