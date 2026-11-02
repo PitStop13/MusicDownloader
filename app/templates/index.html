@@ -33,8 +33,7 @@
                             <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                         </svg>
                         <span>I Miei Download</span>
-                        <span class="badge-count" id="filesCountBadge">0</span>
-                        <span class="nav-live-indicator" id="navLiveIndicator" style="display:none;" title="Download in corso">
+                        <span class="nav-live-indicator" id="navLiveIndicator" style="display:none;" title="Download in corso sul tuo dispositivo">
                             <span class="live-dot"></span>
                             <span id="navLiveText">1 in corso</span>
                         </span>
@@ -359,22 +358,15 @@
                 </div>
             </section>
 
-            <!-- 4. MY DOWNLOADS SECTION (TUTTO UNIFICATO IN UN'UNICA SEZIONE DOWNLOAD) -->
+            <!-- 4. MY DOWNLOADS SECTION (CLIENT-ONLY, ZERO SERVER STORAGE) -->
             <section id="filesSection" class="view-section" style="display:none;">
                 <div class="section-header">
                     <div>
-                        <h2 class="section-title">📂 I Miei Download</h2>
-                        <p class="section-desc">Monitora i download in tempo reale e gestisci tutti i file scaricati</p>
+                        <h2 class="section-title">📥 I Miei Download (Salvataggio su Client)</h2>
+                        <p class="section-desc">I file vengono salvati direttamente sul tuo dispositivo. Zero spazio occupato sul server!</p>
                     </div>
                     <div class="files-header-actions">
-                        <button class="danger-outline-btn" id="deleteAllFilesBtn" onclick="app.deleteAllFiles()">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
-                            </svg>
-                            <span>Svuota Cartella</span>
-                        </button>
-                        <button class="refresh-files-btn" onclick="app.loadFiles()">
+                        <button class="refresh-files-btn" onclick="app.pollActiveTasks()">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
                             </svg>
@@ -383,12 +375,20 @@
                     </div>
                 </div>
 
-                <!-- SUB-SECTION 1: DOWNLOAD ATTIVI E IN PAUSA -->
+                <!-- CLIENT ONLY EXPLANATION BANNER -->
+                <div class="client-only-banner">
+                    <span class="banner-icon">🛡️</span>
+                    <div>
+                        <strong>Salvataggio Diretto sul tuo Dispositivo</strong>: Qualsiasi canzone o video viene convertito al volo e inviato direttamente al tuo browser per il download sul tuo computer o smartphone. Al termine del download, il file viene cancellato istantaneamente dal server, garantendo massima privacy e zero memoria consumata su CasaOS/NAS!
+                    </div>
+                </div>
+
+                <!-- ACTIVE DOWNLOADS PANEL -->
                 <div id="activeDownloadsWrapper" class="active-downloads-panel" style="display:none;">
                     <div class="sub-section-header">
                         <div class="sub-header-left">
                             <div class="pulse-dot-active"></div>
-                            <h3 class="sub-section-title">Download in Corso (<span id="activeDownloadsCount">0</span>)</h3>
+                            <h3 class="sub-section-title">Download della Sessione (<span id="activeDownloadsCount">0</span>)</h3>
                         </div>
                         <button class="clear-tasks-btn" onclick="app.clearFinishedTasks()">
                             Pulisci terminati
@@ -399,31 +399,13 @@
                     </div>
                 </div>
 
-                <!-- SUB-SECTION 2: FILE COMPLETATI SALVATI SU DISCO -->
-                <div class="completed-downloads-panel">
-                    <div class="sub-section-header" style="margin-top: 10px; margin-bottom: 12px;">
-                        <h3 class="sub-section-title completed-title">
-                            File Scaricati su Disco (<span id="completedFilesCount">0</span>)
-                        </h3>
-                    </div>
-
-                    <div id="filesLoading" class="loading-state" style="display:none;">
-                        <div class="big-spinner"></div>
-                        <p>Caricamento file...</p>
-                    </div>
-
-                    <div id="filesEmpty" class="empty-state" style="display:none;">
-                        <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12 0c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zM9 10l12-3"/>
-                        </svg>
-                        <h3>Nessun file scaricato ancora</h3>
-                        <p>Cerca una canzone o sfoglia i brani popolari per scaricare il tuo primo MP3 o MP4.</p>
-                        <button class="primary-btn" onclick="app.showPopular()">Esplora Canzoni Popolari</button>
-                    </div>
-
-                    <div id="filesListContainer" class="files-list">
-                        <!-- Populated dynamically via JS -->
-                    </div>
+                <div id="filesEmpty" class="empty-state" style="display:none;">
+                    <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12 0c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zM9 10l12-3"/>
+                    </svg>
+                    <h3>Nessun download attivo al momento</h3>
+                    <p>Cerca una canzone o sfoglia i brani popolari per scaricare musica o video direttamente sul tuo dispositivo.</p>
+                    <button class="primary-btn" onclick="app.showPopular()">Esplora Canzoni Popolari</button>
                 </div>
             </section>
         </main>

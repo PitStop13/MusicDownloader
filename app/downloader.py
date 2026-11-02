@@ -3,6 +3,7 @@ import re
 import uuid
 import time
 import shutil
+import tempfile
 import threading
 import requests
 import yt_dlp
@@ -11,9 +12,9 @@ from mutagen.easyid3 import EasyID3
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3, APIC, TIT2, TPE1, TALB
 
-# Directory configuration: configurable via env var
-DOWNLOADS_DIR = os.getenv("DOWNLOADS_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "downloads")))
-os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+# Ephemeral temporary directory: files exist ONLY during conversion/transmission, then deleted immediately!
+TEMP_DIR = os.getenv("TEMP_DIR", os.path.join(tempfile.gettempdir(), "musicdownloader_temp"))
+os.makedirs(TEMP_DIR, exist_ok=True)
 
 # Custom Exceptions for clean task control
 class DownloadPausedException(Exception):
@@ -43,6 +44,12 @@ def get_task(task_id: str) -> Optional[Dict[str, Any]]:
         return serialize_task(task) if task else None
 
 
+def get_raw_task(task_id: str) -> Optional[Dict[str, Any]]:
+    """Return the raw in-memory task dictionary including internal filepaths."""
+    with _LOCK:
+        return _TASKS.get(task_id)
+
+
 def get_all_tasks() -> List[Dict[str, Any]]:
     with _LOCK:
         tasks = [serialize_task(t) for t in _TASKS.values()]
@@ -67,15 +74,36 @@ def _sanitize_filename(name: str) -> str:
     return clean[:120] if clean else "download"
 
 
+def cleanup_task_file(task_id: str) -> bool:
+    """
+    Delete the generated media file from the server immediately after delivery to client browser.
+    Ensures 0 bytes remain on the server!
+    """
+    with _LOCK:
+        task = _TASKS.get(task_id)
+        if not task:
+            return False
+        filepath = task.get("filepath")
+        if filepath and os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+                task["filepath"] = None
+                task["server_cleaned"] = True
+                print(f"[Client-Only Delivery] File temporaneo per task {task_id} eliminato dal server con successo.")
+                return True
+            except Exception as e:
+                print(f"[Warning] Impossibile eliminare {filepath}: {e}")
+    return False
+
+
 def _cleanup_partial_files(task: Dict[str, Any]):
     """Clean up .part, .ytdl, or temporary files associated with task."""
     try:
         clean_title = _sanitize_filename(task.get("title", ""))
         now = time.time()
-        for f in os.listdir(DOWNLOADS_DIR):
+        for f in os.listdir(TEMP_DIR):
             if f.endswith(('.part', '.ytdl', '.temp')):
-                full_p = os.path.join(DOWNLOADS_DIR, f)
-                # If name matches or modified in last 2 hours
+                full_p = os.path.join(TEMP_DIR, f)
                 if not clean_title or clean_title.lower() in f.lower() or abs(os.path.getmtime(full_p) - now) < 7200:
                     try:
                         os.remove(full_p)
@@ -83,6 +111,28 @@ def _cleanup_partial_files(task: Dict[str, Any]):
                         pass
     except Exception as e:
         print(f"[Warning] Failed to cleanup partial files: {e}")
+
+
+# Background sweeper for any abandoned temporary files (>10 minutes old)
+def _periodic_cleanup_sweeper():
+    while True:
+        try:
+            now = time.time()
+            if os.path.exists(TEMP_DIR):
+                for entry in os.scandir(TEMP_DIR):
+                    if entry.is_file():
+                        # Delete any file older than 10 minutes
+                        if now - entry.stat().st_mtime > 600:
+                            try:
+                                os.remove(entry.path)
+                            except Exception:
+                                pass
+        except Exception:
+            pass
+        time.sleep(180)
+
+_cleaner_thread = threading.Thread(target=_periodic_cleanup_sweeper, daemon=True)
+_cleaner_thread.start()
 
 
 def _embed_metadata_and_art(mp3_path: str, title: str, artist: str, album: Optional[str] = None, thumbnail_url: Optional[str] = None):
@@ -201,7 +251,6 @@ def _run_download_thread(
             target_id_or_url = official_video_id
             _update_task(task_id, is_official_clip=True)
         else:
-            # Check if current track is an Art Track
             try:
                 ydl_check_opts = {'quiet': True, 'skip_download': True}
                 check_url = target_id_or_url if target_id_or_url.startswith("http") else f"https://www.youtube.com/watch?v={target_id_or_url}"
@@ -221,7 +270,7 @@ def _run_download_thread(
     url = target_id_or_url if target_id_or_url.startswith("http") else f"https://www.youtube.com/watch?v={target_id_or_url}"
 
     try:
-        out_template = os.path.join(DOWNLOADS_DIR, "%(title)s.%(ext)s")
+        out_template = os.path.join(TEMP_DIR, "%(title)s.%(ext)s")
         hook = _progress_hook(task_id)
 
         if output_format == "mp3":
@@ -290,13 +339,13 @@ def _run_download_thread(
             
             ext = "mp3" if output_format == "mp3" else "mp4"
             final_filename = f"{clean_title}.{ext}"
-            final_path = os.path.join(DOWNLOADS_DIR, final_filename)
+            final_path = os.path.join(TEMP_DIR, final_filename)
 
             # Check if file exists under original title template
             if not os.path.exists(final_path):
-                for f in os.listdir(DOWNLOADS_DIR):
+                for f in os.listdir(TEMP_DIR):
                     if f.endswith(f".{ext}"):
-                        candidate = os.path.join(DOWNLOADS_DIR, f)
+                        candidate = os.path.join(TEMP_DIR, f)
                         if abs(os.path.getmtime(candidate) - time.time()) < 90:
                             final_path = candidate
                             final_filename = f
@@ -322,6 +371,7 @@ def _run_download_thread(
                 filepath=final_path,
                 file_size=file_size,
                 completed_at=time.time(),
+                download_url=f"/api/download/file/{task_id}",
                 speed="",
                 eta=""
             )
@@ -378,6 +428,7 @@ def start_download_task(
         "eta": "",
         "filename": None,
         "filepath": None,
+        "download_url": None,
         "file_size": 0,
         "error": None,
         "created_at": time.time(),
@@ -480,60 +531,49 @@ def delete_task(task_id: str) -> bool:
 
 
 def list_downloaded_files() -> List[Dict[str, Any]]:
-    """List all completed audio and video files in the downloads directory."""
-    files: List[Dict[str, Any]] = []
-    if not os.path.exists(DOWNLOADS_DIR):
-        return files
-
-    for entry in os.scandir(DOWNLOADS_DIR):
-        if entry.is_file() and entry.name.lower().endswith(('.mp3', '.mp4', '.m4a')):
-            stats = entry.stat()
-            ext = entry.name.split('.')[-1].lower()
-            size_mb = stats.st_size / (1024 * 1024)
-            
-            created_str = time.strftime('%d/%m/%Y %H:%M', time.localtime(stats.st_mtime))
-            files.append({
-                "filename": entry.name,
-                "format": ext,
-                "size_mb": round(size_mb, 2),
-                "size_bytes": stats.st_size,
-                "created_at": created_str,
-                "timestamp": stats.st_mtime
-            })
-
-    files.sort(key=lambda x: x["timestamp"], reverse=True)
-    return files
+    """Returns empty list: files are NOT stored on the server!"""
+    return []
 
 
-def get_safe_file_path(filename: str) -> Optional[str]:
-    """Prevent directory traversal and return absolute file path if exists."""
-    safe_name = os.path.basename(filename)
-    full_path = os.path.join(DOWNLOADS_DIR, safe_name)
-    if os.path.exists(full_path) and os.path.isfile(full_path):
-        return full_path
+def get_safe_file_path(filename_or_id: str) -> Optional[str]:
+    """Look up file path in ephemeral TEMP_DIR or by task."""
+    with _LOCK:
+        for task in _TASKS.values():
+            if task.get("filename") == filename_or_id or task.get("task_id") == filename_or_id:
+                fp = task.get("filepath")
+                if fp and os.path.exists(fp):
+                    return fp
+
+    safe_name = os.path.basename(filename_or_id)
+    cand = os.path.join(TEMP_DIR, safe_name)
+    if os.path.exists(cand) and os.path.isfile(cand):
+        return cand
     return None
 
 
-def delete_file(filename: str) -> bool:
-    """Delete a single downloaded file."""
-    path = get_safe_file_path(filename)
+def delete_file(filename_or_id: str) -> bool:
+    """Delete a temporary file."""
+    path = get_safe_file_path(filename_or_id)
     if path and os.path.exists(path):
-        os.remove(path)
-        return True
+        try:
+            os.remove(path)
+            return True
+        except Exception:
+            pass
     return False
 
 
 def delete_all_files() -> int:
-    """Delete all downloaded files in the storage directory."""
+    """Delete all files in TEMP_DIR."""
     deleted_count = 0
-    if not os.path.exists(DOWNLOADS_DIR):
+    if not os.path.exists(TEMP_DIR):
         return 0
 
-    for entry in os.scandir(DOWNLOADS_DIR):
-        if entry.is_file() and entry.name.lower().endswith(('.mp3', '.mp4', '.m4a')):
+    for entry in os.scandir(TEMP_DIR):
+        if entry.is_file():
             try:
                 os.remove(entry.path)
                 deleted_count += 1
-            except Exception as e:
-                print(f"[Warning] Failed to delete {entry.name}: {e}")
+            except Exception:
+                pass
     return deleted_count

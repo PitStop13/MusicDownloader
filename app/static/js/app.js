@@ -87,7 +87,6 @@ const app = {
     showFiles() {
         this.resetPreviewPlayer();
         this.switchView('files');
-        this.loadFiles();
         this.renderActiveTasksSection();
     },
 
@@ -545,14 +544,14 @@ const app = {
                         this.loadFiles();
                     }
 
-                    // Trigger salvataggio automatico nel browser
-                    const encodedName = encodeURIComponent(t.filename);
+                    // Trigger salvataggio automatico diretto nel browser (Client-Side)
                     const triggerLink = document.createElement('a');
-                    triggerLink.href = `/api/files/download/${encodedName}`;
+                    triggerLink.href = `/api/download/file/${t.task_id}`;
                     triggerLink.download = t.filename;
                     document.body.appendChild(triggerLink);
                     triggerLink.click();
                     document.body.removeChild(triggerLink);
+                    this.showToast(`✓ File inviato al browser e salvato sul tuo dispositivo: ${t.filename}`, 'success');
                 }
             });
 
@@ -728,8 +727,7 @@ const app = {
             mp4Btn.disabled = false;
 
             const browserDownloadBtn = document.getElementById('browserDownloadBtn');
-            const encodedName = encodeURIComponent(matchingTask.filename);
-            browserDownloadBtn.href = `/api/files/download/${encodedName}`;
+            browserDownloadBtn.href = `/api/download/file/${matchingTask.task_id}`;
             browserDownloadBtn.setAttribute('download', matchingTask.filename);
         } else if (matchingTask.status === 'cancelled') {
             statusText.textContent = '⏹️ Download annullato. Memoria liberata.';

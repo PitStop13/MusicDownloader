@@ -61,13 +61,14 @@
   - **Pausa**: sospendi qualsiasi download in corso salvaguardando i byte scaricati fino a quel momento.
   - **Ripresa dal punto esatto**: riparti istantaneamente dal punto e byte in cui era stato interrotto senza riscaricare tutto da capo.
   - **Annulla & Libera Memoria**: interrompe il processo e rimuove automaticamente i file temporanei `.part`, liberando subito memoria RAM e spazio disco.
-- 📁 **Salvataggio Automatico sul Computer & Download nel Browser**:
-  - Tutti i file scaricati finiscono istantaneamente nella cartella locale `./downloads` del tuo computer grazie al volume montato in Docker.
-  - Pulsante per il download diretto nel browser se accedi da smartphone o altri dispositivi connessi alla rete locale.
-- 📂 **Gestore "I Miei Download" & Svuotamento Rapido**:
-  - Visualizza tutti i file scaricati con dimensione e data.
-  - Eliminazione sicura di singoli brani anche con apostrofi e caratteri speciali nel nome.
-  - Pulsante **"Svuota Cartella"** per eliminare l'intero archivio con un click.
+- 💻 **100% Salvataggio Diretto sul Client (Zero Memoria sul Server)**:
+  - I file scaricati (MP3 e MP4) vengono inviati **esclusivamente e direttamente al dispositivo** (PC, smartphone o tablet) che apre l'applicazione web.
+  - Il server converte i flussi al volo ed **elimina immediatamente qualsiasi file temporaneo** non appena il trasferimento verso il browser del client è completato.
+  - Nessun file musicale o video si accumula sul server o nel container Docker: massima privacy, zero spazio disco consumato su CasaOS o NAS!
+- 📥 **Gestore Unificato "I Miei Download" & Badge di Notifica**:
+  - Un'unica sezione intuitiva che mostra l'avanzamento dei download attivi, velocità (MB/s), tempo rimanente e stato di completamento.
+  - Download trigger automatico nel browser al 100% con notifica a comparsa.
+  - Badge dinamico nella barra di navigazione con conteggio live delle conversioni in corso.
 
 ---
 
@@ -79,12 +80,12 @@ flowchart TD
     B --> C[🎵 Seleziona il brano dall'elenco]
     C --> D[📄 Pagina Dettagli + 🎧 Anteprima Ascolto]
     D --> E{Cosa vuoi scaricare?}
-    E -->|🎵 Canzone Audio| F[Estrazione Audio + Conversione MP3 a 320kbps con FFmpeg]
-    E -->|🎬 Filmato Video| G[Fusione Video HD/4K + Audio Hi-Fi in formato MP4]
-    F --> H[🏷️ Embedding Copertina HD + Tag ID3 Artista/Titolo/Album]
-    G --> I[📁 Salvataggio automatico nella cartella .\downloads]
-    H --> I
-    I --> J[📥 Disponibile anche per il download diretto nel browser]
+    E -->|🎵 Canzone Audio| F[Conversione al volo MP3 a 320kbps con FFmpeg + Tag ID3 e Cover]
+    E -->|🎬 Filmato Video| G[Fusione al volo Video HD/4K + Audio Hi-Fi in formato MP4]
+    F --> H[💻 Streaming Diretto nel Browser del Client]
+    G --> H
+    H --> I[💾 Salvataggio Automatico nei Download del tuo Dispositivo]
+    I --> J[🧹 Cancellazione Istantanea dal Server: 0 Byte rimasti!]
 ```
 
 ---
@@ -107,25 +108,16 @@ services:
     container_name: musicdownloader-app
     ports:
       - "8765:8765"
-    volumes:
-      # Cartella sul tuo NAS/Server dove memorizzare i download musicali e video
-      - /DATA/Media/Music:/app/downloads
     environment:
       - PYTHONUNBUFFERED=1
-      - DOWNLOADS_DIR=/app/downloads
       - PORT=8765
     restart: unless-stopped
     x-casaos:
       ports:
         - container: "8765"
           description:
-            en_us: Porta interfaccia Web MusicDownloader
+            en_us: Web UI port for MusicDownloader
             it_it: Porta interfaccia Web MusicDownloader
-      volumes:
-        - container: /app/downloads
-          description:
-            en_us: Cartella download brani MP3 e video MP4
-            it_it: Cartella download brani MP3 e video MP4
 x-casaos:
   architectures:
     - amd64
@@ -133,11 +125,11 @@ x-casaos:
     - arm
   main: musicdownloader
   description:
-    en_us: Modern web interface to search, preview, and download music (320kbps MP3 with embedded ID3 tags & cover art) and videos (HD/4K MP4) from YouTube, YouTube Music, and Spotify.
-    it_it: Interfaccia web moderna per cercare, ascoltare e scaricare musica (MP3 a 320 kbps con tag ID3 e copertina) e video (MP4 HD/4K) da YouTube, YouTube Music e Spotify.
+    en_us: Modern web interface to search, preview, and download music (320kbps MP3 with embedded ID3 tags & cover art) and videos (HD/4K MP4) directly to the client browser. Zero server disk usage!
+    it_it: Interfaccia web moderna per cercare, ascoltare e scaricare musica (MP3 a 320 kbps con tag ID3 e copertina) e video (MP4 HD/4K) direttamente sul browser del tuo dispositivo. Zero spazio occupato sul server/NAS!
   tagline:
-    en_us: Music & Video Downloader
-    it_it: Downloader Musica & Video
+    en_us: Direct Client Music & Video Downloader
+    it_it: Downloader Diretto Musica & Video sul Client
   developer: MusicDownloader
   author: PitStop13
   icon: https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
@@ -221,8 +213,8 @@ La suite verifica automaticamente:
 4. ✅ Ricerca incrementale con debounce (`/api/search`)
 5. ✅ Risoluzione automatica dei link Spotify oEmbed
 6. ✅ Estrazione dettagli e qualità video 4K / audio 320kbps
-7. ✅ Download MP3 a 320 kbps con verifica copertina ID3 e pulizia file
-8. ✅ Download Video MP4 (4K/HD) con multiplexing FFmpeg, streaming e pulizia file
+7. ✅ Download MP3 a 320 kbps su client con verifica copertina ID3 e rimozione immediata dal server
+8. ✅ Download Video MP4 (4K/HD) su client con multiplexing FFmpeg e rimozione immediata dal server
 
 ---
 

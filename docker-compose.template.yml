@@ -5,25 +5,16 @@ services:
     container_name: musicdownloader-app
     ports:
       - "8765:8765"
-    volumes:
-      # Cartella sul tuo NAS/Server dove memorizzare i download musicali e video
-      - /DATA/Media/Music:/app/downloads
     environment:
       - PYTHONUNBUFFERED=1
-      - DOWNLOADS_DIR=/app/downloads
       - PORT=8765
     restart: unless-stopped
     x-casaos:
       ports:
         - container: "8765"
           description:
-            en_us: Porta interfaccia Web MusicDownloader
+            en_us: Web UI port for MusicDownloader
             it_it: Porta interfaccia Web MusicDownloader
-      volumes:
-        - container: /app/downloads
-          description:
-            en_us: Cartella download brani MP3 e video MP4
-            it_it: Cartella download brani MP3 e video MP4
 
 x-casaos:
   architectures:
@@ -32,11 +23,11 @@ x-casaos:
     - arm
   main: musicdownloader
   description:
-    en_us: Modern web interface to search, preview, and download music (320kbps MP3 with embedded ID3 tags & cover art) and videos (HD/4K MP4) from YouTube, YouTube Music, and Spotify.
-    it_it: Interfaccia web moderna per cercare, ascoltare e scaricare musica (MP3 a 320 kbps con tag ID3 e copertina) e video (MP4 HD/4K) da YouTube, YouTube Music e Spotify.
+    en_us: Modern web interface to search, preview, and download music (320kbps MP3 with embedded ID3 tags & cover art) and videos (HD/4K MP4) directly to the client browser. Zero server disk usage!
+    it_it: Interfaccia web moderna per cercare, ascoltare e scaricare musica (MP3 a 320 kbps con tag ID3 e copertina) e video (MP4 HD/4K) direttamente sul browser del tuo dispositivo. Zero spazio occupato sul server/NAS!
   tagline:
-    en_us: Music & Video Downloader
-    it_it: Downloader Musica & Video
+    en_us: Direct Client Music & Video Downloader
+    it_it: Downloader Diretto Musica & Video sul Client
   developer: MusicDownloader
   author: PitStop13
   icon: https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png

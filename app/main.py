@@ -15,6 +15,8 @@ from app.music_service import (
 from app.downloader import (
     start_download_task,
     get_task,
+    get_raw_task,
+    cleanup_task_file,
     get_all_tasks,
     pause_download_task,
     resume_download_task,
@@ -192,44 +194,79 @@ async def api_task_delete(task_id: str):
     }
 
 
-@app.get("/api/files")
-async def api_list_files():
-    """List all downloaded files saved on the server."""
-    files = list_downloaded_files()
-    total_size = sum(f["size_mb"] for f in files)
-    return {
-        "success": True,
-        "count": len(files),
-        "total_size_mb": round(total_size, 2),
-        "files": files
-    }
+@app.get("/api/download/file/{task_id}")
+async def api_download_file_direct(task_id: str, background_tasks: BackgroundTasks):
+    """
+    Streams the media file directly to the client browser and immediately
+    deletes the temporary file from the server upon transfer completion.
+    Zero bytes stored permanently on the server!
+    """
+    task = get_raw_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Attività non trovata o scaduta.")
 
+    filepath = task.get("filepath")
+    if not filepath or not os.path.exists(filepath):
+        filepath = get_safe_file_path(task.get("filename", ""))
 
-@app.delete("/api/files")
-async def api_delete_all_files():
-    """Delete all downloaded files from server storage."""
-    deleted_count = delete_all_files()
-    return {
-        "success": True,
-        "deleted_count": deleted_count,
-        "message": f"Eliminati {deleted_count} file con successo."
-    }
+    if not filepath or not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="File non trovato o già scaricato sul tuo dispositivo.")
+
+    filename = task.get("filename", "download.mp3")
+    media_type = "audio/mpeg" if filename.lower().endswith(".mp3") else "video/mp4"
+
+    # Immediately delete from server after streaming finishes
+    background_tasks.add_task(cleanup_task_file, task_id)
+
+    return FileResponse(
+        path=filepath,
+        filename=filename,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-cache, no-store, must-revalidate"
+        }
+    )
 
 
 @app.get("/api/files/download/{filename}")
-async def api_download_file(filename: str):
-    """Download the saved MP3 or MP4 file directly to the browser."""
+async def api_download_file(filename: str, background_tasks: BackgroundTasks):
+    """Download the media file directly to the browser and delete from server."""
     path = get_safe_file_path(filename)
     if not path:
         raise HTTPException(status_code=404, detail="File non trovato.")
 
     media_type = "audio/mpeg" if filename.lower().endswith(".mp3") else "video/mp4"
+    background_tasks.add_task(delete_file, filename)
     return FileResponse(
         path=path,
         filename=filename,
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
+
+
+@app.get("/api/files")
+async def api_list_files():
+    """Confirms 100% client-side downloads without server storage."""
+    return {
+        "success": True,
+        "count": 0,
+        "client_only": True,
+        "files": [],
+        "message": "I download avvengono esclusivamente sul client. Nessun file è memorizzato sul server."
+    }
+
+
+@app.delete("/api/files")
+async def api_delete_all_files():
+    """Delete all temporary files from server storage."""
+    deleted_count = delete_all_files()
+    return {
+        "success": True,
+        "deleted_count": deleted_count,
+        "message": f"Eliminati {deleted_count} file temporanei con successo."
+    }
 
 
 @app.get("/api/files/stream/{filename}")
