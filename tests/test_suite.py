@@ -114,7 +114,6 @@ def test_mp3_download_and_id3_tags():
         r_poll = requests.get(f"{BASE_URL}/api/task/{task_id}", timeout=5)
         task = r_poll.json().get("task", {})
         status = task.get("status")
-        progress = task.get("progress")
         if status == "finished":
             filename = task.get("filename")
             file_size = task.get("file_size")
@@ -160,6 +159,54 @@ def test_mp3_download_and_id3_tags():
     print(" -> Test file cleaned up successfully.")
     print(" -> PASSED: Complete MP3 download and metadata pipeline verified!")
 
+def test_mp4_video_download():
+    print("[TEST 8] Testing MP4 Video Download with FFmpeg Multiplexing...")
+    payload = {
+        "id_or_url": "dQw4w9WgXcQ",
+        "format": "mp4",
+        "title": "Automated Test Video",
+        "artist": "Test Artist"
+    }
+    r = requests.post(f"{BASE_URL}/api/download", json=payload, timeout=10)
+    assert r.status_code == 200
+    task_id = r.json().get("task_id")
+    assert task_id
+
+    # Poll until completed
+    max_wait = 90
+    start = time.time()
+    filename = None
+    while time.time() - start < max_wait:
+        r_poll = requests.get(f"{BASE_URL}/api/task/{task_id}", timeout=5)
+        task = r_poll.json().get("task", {})
+        status = task.get("status")
+        if status == "finished":
+            filename = task.get("filename")
+            file_size = task.get("file_size")
+            print(f" -> MP4 Video downloaded in {int(time.time() - start)}s! File: '{filename}' ({file_size / (1024*1024):.2f} MB)")
+            break
+        elif status == "error":
+            raise Exception(f"MP4 download failed: {task.get('error')}")
+        time.sleep(1)
+
+    assert filename, "MP4 download task timed out"
+    local_path = os.path.join("downloads", filename)
+    assert os.path.exists(local_path), f"Video file {local_path} not found on host"
+    assert os.path.getsize(local_path) > 1024 * 1024, "Video file size too small"
+
+    # Test file stream endpoint for MP4
+    r_stream = requests.get(f"{BASE_URL}/api/files/download/{filename}", stream=True, timeout=5)
+    assert r_stream.status_code == 200
+    assert r_stream.headers.get("content-type") == "video/mp4"
+    print(" -> MP4 Video stream endpoint verified (HTTP 200 video/mp4).")
+
+    # Cleanup test video
+    r_del = requests.delete(f"{BASE_URL}/api/files/{filename}", timeout=5)
+    assert r_del.status_code == 200
+    assert not os.path.exists(local_path)
+    print(" -> Test MP4 video cleaned up successfully.")
+    print(" -> PASSED: Complete MP4 video download pipeline verified!")
+
 if __name__ == "__main__":
     if sys.stdout.encoding != 'utf-8':
         try:
@@ -176,6 +223,7 @@ if __name__ == "__main__":
     test_spotify_resolution()
     test_details()
     test_mp3_download_and_id3_tags()
+    test_mp4_video_download()
     print("=" * 60)
-    print("[SUCCESS] TUTTI I 7 TEST COMPLETATI CON SUCCESSO! ZERO ERRORI.")
+    print("[SUCCESS] TUTTI GLI 8 TEST COMPLETATI CON SUCCESSO! ZERO ERRORI.")
     print("=" * 60)

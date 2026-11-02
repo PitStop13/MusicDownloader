@@ -155,6 +155,7 @@ La suite verifica automaticamente:
 5. ✅ Risoluzione automatica dei link Spotify oEmbed
 6. ✅ Estrazione dettagli e qualità video 4K / audio 320kbps
 7. ✅ Download MP3 a 320 kbps con verifica copertina ID3 e pulizia file
+8. ✅ Download Video MP4 (4K/HD) con multiplexing FFmpeg, streaming e pulizia file
 
 ---
 
