@@ -1,5 +1,8 @@
+name: musicdownloader
+
 services:
   music-downloader:
+    image: ghcr.io/pitstop13/musicdownloader:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -7,11 +10,45 @@ services:
     ports:
       - "8765:8765"
     volumes:
-      # Volume per i file scaricati (MP3 e MP4) visibili direttamente sul tuo computer
+      # Volume per i file scaricati (MP3 e MP4) visibili direttamente sul tuo computer / NAS
       - ./downloads:/app/downloads
-      # Volume per il codice sorgente (modifiche e fix applicati all'istante senza dover ricompilare)
+      # Volume per il codice sorgente (per modifiche istantanee in locale)
       - ./app:/app/app
     restart: unless-stopped
     environment:
       - PYTHONUNBUFFERED=1
       - DOWNLOADS_DIR=/app/downloads
+      - PORT=8765
+    x-casaos:
+      ports:
+        - container: "8765"
+          description:
+            en_us: Web UI port for MusicDownloader
+            it_it: Porta interfaccia Web MusicDownloader
+      volumes:
+        - container: /app/downloads
+          description:
+            en_us: Downloads folder for MP3 and MP4 files
+            it_it: Cartella download brani MP3 e video MP4
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+    - arm
+  main: music-downloader
+  description:
+    en_us: Modern web interface to search, preview, and download music (320kbps MP3 with embedded ID3 tags & cover art) and videos (HD/4K MP4) from YouTube, YouTube Music, and Spotify.
+    it_it: Interfaccia web moderna per cercare, ascoltare e scaricare musica (MP3 a 320 kbps con tag ID3 e copertina) e video (MP4 HD/4K) da YouTube, YouTube Music e Spotify.
+  tagline:
+    en_us: Music & Video Downloader
+    it_it: Downloader Musica & Video
+  developer: MusicDownloader
+  author: PitStop13
+  icon: https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
+  thumbnail: https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
+  title:
+    en_us: MusicDownloader
+    it_it: MusicDownloader
+  index: /
+  port_map: "8765"

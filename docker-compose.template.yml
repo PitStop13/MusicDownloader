@@ -1,0 +1,48 @@
+name: musicdownloader
+services:
+  musicdownloader:
+    image: ghcr.io/pitstop13/musicdownloader:latest
+    container_name: musicdownloader-app
+    ports:
+      - "8765:8765"
+    volumes:
+      # Cartella sul tuo NAS/Server dove memorizzare i download musicali e video
+      - /DATA/Media/Music:/app/downloads
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DOWNLOADS_DIR=/app/downloads
+      - PORT=8765
+    restart: unless-stopped
+    x-casaos:
+      ports:
+        - container: "8765"
+          description:
+            en_us: Porta interfaccia Web MusicDownloader
+            it_it: Porta interfaccia Web MusicDownloader
+      volumes:
+        - container: /app/downloads
+          description:
+            en_us: Cartella download brani MP3 e video MP4
+            it_it: Cartella download brani MP3 e video MP4
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+    - arm
+  main: musicdownloader
+  description:
+    en_us: Modern web interface to search, preview, and download music (320kbps MP3 with embedded ID3 tags & cover art) and videos (HD/4K MP4) from YouTube, YouTube Music, and Spotify.
+    it_it: Interfaccia web moderna per cercare, ascoltare e scaricare musica (MP3 a 320 kbps con tag ID3 e copertina) e video (MP4 HD/4K) da YouTube, YouTube Music e Spotify.
+  tagline:
+    en_us: Music & Video Downloader
+    it_it: Downloader Musica & Video
+  developer: MusicDownloader
+  author: PitStop13
+  icon: https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
+  thumbnail: https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
+  title:
+    en_us: MusicDownloader
+    it_it: MusicDownloader
+  index: /
+  port_map: "8765"

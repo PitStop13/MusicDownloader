@@ -10,6 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" />
+  <img src="https://img.shields.io/badge/CasaOS-Compatible-00D1B2?style=for-the-badge&logo=linux&logoColor=white" />
   <img src="https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white" />
   <img src="https://img.shields.io/badge/FFmpeg-Included-007808?style=for-the-badge&logo=ffmpeg&logoColor=white" />
@@ -76,26 +77,83 @@ flowchart TD
     I --> J[📥 Disponibile anche per il download diretto nel browser]
 ```
 
-### 1. Ricerca del Brano
-Scrivi almeno 3 lettere nella barra di ricerca in alto (es. `Coldplay` o `Alfa`). Non serve premere Invio o cliccare bottoni: i risultati compaiono immediatamente a schermo.
+---
 
-### 2. Apertura dei Dettagli
-Clicca sulla card della canzone per aprire la pagina dettagli: qui puoi cliccare su **"Ascolta Anteprima"** per ascoltare la canzone.
+## 🏠 Installazione e Avvio
 
-### 3. Scelta del Formato di Download
-- **Bottone Viola (Audio MP3)**: Estrae l'audio, lo codifica a 320 kbps con FFmpeg e applica i tag ID3 con la copertina inclusa nel file.
-- **Bottone Azzurro (Video MP4)**: Scarica il video alla massima risoluzione supportata (fino a 4K) con l'audio sincronizzato.
+### 1. Installazione su CasaOS (Home Server / NAS) 🏠
 
-### 4. Dove si trova il file scaricato?
-Il file viene salvato immediatamente:
-- Nella cartella **`downloads/`** presente all'interno del progetto sul tuo PC;
-- Nel tuo browser, cliccando sul pulsante verde **"Scarica subito nel browser"**.
+#### Metodo 1: Dall'interfaccia web di CasaOS (Consigliato - 1 Click)
+
+1. Nella dashboard di CasaOS, clicca sul pulsante **"+"** (in alto a destra nella sezione App) e seleziona **"Installa un'applicazione personalizzata"** (*Install a customized app*).
+2. In alto a destra della finestra, clicca sull'icona **"Importa"** (`</>` o icona file).
+3. Incolla il seguente codice Docker Compose completo:
+
+```yaml
+name: musicdownloader
+services:
+  musicdownloader:
+    image: ghcr.io/pitstop13/musicdownloader:latest
+    container_name: musicdownloader-app
+    ports:
+      - "8765:8765"
+    volumes:
+      # Cartella sul tuo NAS/Server dove memorizzare i download musicali e video
+      - /DATA/Media/Music:/app/downloads
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DOWNLOADS_DIR=/app/downloads
+      - PORT=8765
+    restart: unless-stopped
+    x-casaos:
+      ports:
+        - container: "8765"
+          description:
+            en_us: Porta interfaccia Web MusicDownloader
+            it_it: Porta interfaccia Web MusicDownloader
+      volumes:
+        - container: /app/downloads
+          description:
+            en_us: Cartella download brani MP3 e video MP4
+            it_it: Cartella download brani MP3 e video MP4
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+    - arm
+  main: musicdownloader
+  description:
+    en_us: Modern web interface to search, preview, and download music (320kbps MP3 with embedded ID3 tags & cover art) and videos (HD/4K MP4) from YouTube, YouTube Music, and Spotify.
+    it_it: Interfaccia web moderna per cercare, ascoltare e scaricare musica (MP3 a 320 kbps con tag ID3 e copertina) e video (MP4 HD/4K) da YouTube, YouTube Music e Spotify.
+  tagline:
+    en_us: Music & Video Downloader
+    it_it: Downloader Musica & Video
+  developer: MusicDownloader
+  author: PitStop13
+  icon: https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
+  thumbnail: https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
+  title:
+    en_us: MusicDownloader
+    it_it: MusicDownloader
+  index: /
+  port_map: "8765"
+```
+
+4. Clicca su **"Invia"** (*Submit*). I parametri principali, l'icona ufficiale, il titolo e la porta risulteranno **già tutti precompilati automaticamente**.
+5. Clicca su **"Installa"** e attendi il download dell'immagine pubblicata da GitHub Container Registry.
+6. Apri MusicDownloader cliccando sulla sua icona o collegandoti a: 👉 **`http://<IP-DEL-TUO-SERVER>:8765`**
+
+#### Metodo 2: Da Terminale o SSH (Server / NAS)
+```bash
+cd /DATA/AppData
+git clone https://github.com/PitStop13/MusicDownloader.git
+cd MusicDownloader
+docker compose up -d
+```
 
 ---
 
-## 🚀 Avvio Rapido
-
-### Opzione 1: Con 1 Click su Windows (Consigliata)
+### 2. Con 1 Click su Windows
 Fai doppio clic sul file:
 ```cmd
 start.bat
@@ -107,11 +165,10 @@ Lo script si occuperà di:
 
 ---
 
-### Opzione 2: Tramite Docker Compose (Windows / Mac / Linux)
+### 3. Tramite Docker Compose (Windows / Mac / Linux)
 Nel terminale della cartella del progetto:
 
 ```bash
-# Avvia il container in background
 docker compose up --build -d
 ```
 
@@ -125,25 +182,7 @@ docker compose down
 
 ---
 
-### Opzione 3: Installazione su CasaOS 🏠
-Puoi aggiungere facilmente **MusicDownloader** alla tua dashboard di CasaOS come app personalizzata (o importando direttamente il `docker-compose.yml`):
-
-1. Su CasaOS, apri l'**App Store** e clicca su **Custom Install** (in alto a destra).
-2. Compila i campi della schermata:
-   - **App Name**: `MusicDownloader`
-   - **Icon URL**:
-     ```text
-     https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
-     ```
-     *(oppure in locale: `http://[IP-DEL-TUO-SERVER]:8765/static/icons/logo.png`)*
-   - **Porta Web UI**: `8765`
-   - **Porta Container**: `8765` -> **Porta Host**: `8765`
-   - **Volume Host**: `/DATA/Media/Music` (o la cartella che preferisci) -> **Container**: `/app/downloads`
-3. Clicca su **Submit / Salva**: l'icona ufficiale apparirà subito nella dashboard di CasaOS!
-
----
-
-### Opzione 4: Esecuzione Locale Senza Docker (Python)
+### 4. Esecuzione Locale Senza Docker (Python)
 Se preferisci eseguire l'app direttamente in Python sul tuo computer:
 
 ```bash
@@ -181,28 +220,34 @@ La suite verifica automaticamente:
 
 ```
 MusicDownloader/
+├── .github/
+│   └── workflows/
+│       └── docker-publish.yml # Build & pubblicazione automatica su GHCR (multi-arch amd64/arm64)
 ├── app/
-│   ├── main.py              # Server FastAPI, endpoint REST e download stream
-│   ├── downloader.py        # Pipeline yt-dlp, conversione FFmpeg a 320kbps e ID3 tagging
-│   ├── music_service.py     # Classifiche YouTube Music live e risoluzione Spotify oEmbed
+│   ├── main.py                # Server FastAPI, endpoint REST e download stream
+│   ├── downloader.py          # Pipeline yt-dlp, conversione FFmpeg a 320kbps e ID3 tagging
+│   ├── music_service.py       # Classifiche YouTube Music live e risoluzione Spotify oEmbed
 │   ├── templates/
-│   │   └── index.html       # Single Page Application HTML5
+│   │   └── index.html         # Single Page Application HTML5
 │   └── static/
 │       ├── css/
-│       │   └── style.css    # Tema scuro moderno Glassmorphism
+│       │   └── style.css      # Tema scuro moderno Glassmorphism
 │       ├── js/
-│       │   └── app.js       # Logica client, ricerca incrementale, player e progress bar
+│       │   └── app.js         # Logica client, ricerca incrementale, player e progress bar
 │       └── icons/
-├── assets/                  # Banner SVG e anteprime grafiche
-├── downloads/               # Cartella volume montata sul tuo PC con i file scaricati
+│           ├── logo.png       # Icona ufficiale alta risoluzione
+│           └── logo.jpg
+├── assets/                    # Logo PNG, banner SVG e anteprime grafiche per CasaOS
+├── downloads/                 # Cartella volume montata sul tuo PC con i file scaricati
 ├── tests/
-│   └── test_suite.py        # Suite di test automatizzati end-to-end
-├── Dockerfile               # Immagine Debian con Python 3.11, FFmpeg e Node.js
-├── docker-compose.yml       # Configurazione Docker Compose con volume persistente
-├── requirements.txt         # Dipendenze Python
-├── start.bat                # Avvio con 1-click per Windows
-├── start.sh                 # Script di avvio per Linux / macOS
-└── README.md                # Documentazione ufficiale
+│   └── test_suite.py          # Suite di test automatizzati end-to-end (8 test)
+├── Dockerfile                 # Immagine Debian con Python 3.11, FFmpeg e Node.js
+├── docker-compose.yml         # Configurazione Docker Compose con schema x-casaos
+├── docker-compose.template.yml# Template CasaOS per installazione rapida con 1-click
+├── requirements.txt           # Dipendenze Python
+├── start.bat                  # Avvio con 1-click per Windows
+├── start.sh                   # Script di avvio per Linux / macOS
+└── README.md                  # Documentazione ufficiale
 ```
 
 ---
