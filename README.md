@@ -103,7 +103,7 @@ start.bat
 Lo script si occuperà di:
 1. Verificare che Docker Desktop sia attivo (e avviarlo automaticamente se necessario);
 2. Costruire e avviare il container in background;
-3. Aprire il browser all'indirizzo **`http://localhost:8000`**.
+3. Aprire il browser all'indirizzo **`http://localhost:8765`**.
 
 ---
 
@@ -116,7 +116,7 @@ docker compose up --build -d
 ```
 
 Apri il browser su:
-👉 **http://localhost:8000**
+👉 **http://localhost:8765**
 
 Per fermare il container:
 ```bash

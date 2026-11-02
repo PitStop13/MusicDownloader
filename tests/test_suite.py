@@ -19,7 +19,7 @@ import requests
 from mutagen.mp3 import MP3
 from mutagen.id3 import ID3
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:8765"
 
 def test_health():
     print("[TEST 1] Testing /api/health...")

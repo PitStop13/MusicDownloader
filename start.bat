@@ -54,13 +54,13 @@ if %ERRORLEVEL% NEQ 0 (
 echo.
 echo ========================================================
 echo  [OK] Applicazione avviata con successo!
-echo  [*] Interfaccia Web: http://localhost:8000
+echo  [*] Interfaccia Web: http://localhost:8765
 echo  [*] Cartella download: .\downloads
 echo ========================================================
 echo.
 echo Apertura del browser in corso...
 ping 127.0.0.1 -n 3 >nul
-start http://localhost:8000
+start http://localhost:8765
 
 echo.
 echo Premi un tasto per chiudere questa finestra (il container continuera' a girare).

@@ -22,14 +22,14 @@ docker compose up --build -d
 echo ""
 echo "========================================================"
 echo " [✓] Applicazione avviata con successo!"
-echo " [🌐] Interfaccia Web: http://localhost:8000"
+echo " [🌐] Interfaccia Web: http://localhost:8765"
 echo " [📁] Cartella download: ./downloads"
 echo "========================================================"
 echo ""
 
 # Prova ad aprire il browser
 if command -v xdg-open > /dev/null; then
-    xdg-open http://localhost:8000 >/dev/null 2>&1 &
+    xdg-open http://localhost:8765 >/dev/null 2>&1 &
 elif command -v open > /dev/null; then
-    open http://localhost:8000 >/dev/null 2>&1 &
+    open http://localhost:8765 >/dev/null 2>&1 &
 fi
