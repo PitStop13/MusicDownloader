@@ -88,6 +88,7 @@ const app = {
         this.resetPreviewPlayer();
         this.switchView('files');
         this.loadFiles();
+        this.renderActiveTasksSection();
     },
 
     goBackFromDetails() {
@@ -475,8 +476,7 @@ const app = {
             const data = await res.json();
             if (data.success && data.task_id) {
                 this.currentDetailTaskId = data.task_id;
-                this.openDownloadsDrawer();
-                this.showToast(`Download avviato: ${this.currentTrack.title}`, 'info');
+                this.showToast(`Download avviato! Controllalo in "I Miei Download"`, 'info');
                 this.pollActiveTasks();
             } else {
                 throw new Error('Errore durante l\'avvio dell\'elaborazione');
@@ -489,7 +489,7 @@ const app = {
         }
     },
 
-    // GLOBAL TASKS POLLER (PERSISTENTE IN BACKGROUND TRA LE PAGINE)
+    // GLOBAL TASKS POLLER (IN BACKGROUND PER SINCRONIZZARE I MIEI DOWNLOAD E I BADGE)
     startTasksPoller() {
         if (this.tasksPollerTimer) clearInterval(this.tasksPollerTimer);
         this.pollActiveTasks();
@@ -508,32 +508,30 @@ const app = {
             this.activeTasks.clear();
             tasks.forEach(t => this.activeTasks.set(t.task_id, t));
 
-            // Conteggio attivi (non terminati)
-            const runningTasks = tasks.filter(t => ['starting', 'downloading', 'converting', 'tagging', 'pending', 'paused'].includes(t.status));
-            const activeOnly = tasks.filter(t => ['starting', 'downloading', 'converting', 'tagging', 'pending'].includes(t.status));
+            // Filtro task attivi/in corso
+            const activeOnly = tasks.filter(t => ['starting', 'downloading', 'converting', 'tagging', 'pending', 'paused'].includes(t.status));
 
-            // Aggiorna Badge nella Navbar
-            const navBadge = document.getElementById('activeTasksBadge');
-            if (navBadge) {
+            // Aggiorna indicatore dinamico "in corso" nella Navbar accanto a "I Miei Download"
+            const liveIndicator = document.getElementById('navLiveIndicator');
+            const liveText = document.getElementById('navLiveText');
+            if (liveIndicator && liveText) {
                 if (activeOnly.length > 0) {
-                    navBadge.style.display = 'inline-block';
-                    navBadge.textContent = activeOnly.length;
+                    liveIndicator.style.display = 'inline-flex';
+                    liveText.textContent = `${activeOnly.length} in corso`;
                 } else {
-                    navBadge.style.display = 'none';
+                    liveIndicator.style.display = 'none';
                 }
             }
 
-            // Aggiorna Badge nel Drawer
-            const drawerBadge = document.getElementById('drawerActiveCountBadge');
-            if (drawerBadge) {
-                drawerBadge.textContent = `${activeOnly.length} in corso (${tasks.length} totali)`;
+            // Se siamo nella vista "I Miei Download", aggiorna il pannello dei download in corso
+            if (this.currentView === 'files') {
+                this.renderActiveTasksSection();
             }
 
-            // Rendi render degli elementi nel drawer
-            this.renderDrawerTasks(tasks);
-
             // Sincronizza la vista dettagli se aperta
-            this.syncDetailsTaskWithActive();
+            if (this.currentView === 'details') {
+                this.syncDetailsTaskWithActive();
+            }
 
             // Notifica e trigger download per task appena completati
             tasks.forEach(t => {
@@ -541,6 +539,11 @@ const app = {
                     this.downloadedTaskIds.add(t.task_id);
                     this.showToast(`✓ Download completato: ${t.filename}`, 'success');
                     this.updateFilesCount();
+
+                    // Se siamo nella pagina dei download, aggiorna subito l'elenco dei file scaricati
+                    if (this.currentView === 'files') {
+                        this.loadFiles();
+                    }
 
                     // Trigger salvataggio automatico nel browser
                     const encodedName = encodeURIComponent(t.filename);
@@ -558,20 +561,30 @@ const app = {
         }
     },
 
-    // RENDER TASKS NEL CASSETTO GLOBALE PERSISTENTE
-    renderDrawerTasks(tasks) {
-        const container = document.getElementById('drawerTasksContainer');
-        if (!container) return;
+    // RENDER DOWNLOAD IN CORSO ALL'INTERNO DELLA SEZIONE "I MIEI DOWNLOAD"
+    renderActiveTasksSection() {
+        const wrapper = document.getElementById('activeDownloadsWrapper');
+        const countSpan = document.getElementById('activeDownloadsCount');
+        const container = document.getElementById('activeTasksListContainer');
+        if (!wrapper || !container) return;
 
-        if (!tasks.length) {
-            container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--text-dim); font-size: 0.85rem;">Nessuna attività recente di download.</div>`;
+        const tasks = Array.from(this.activeTasks.values());
+        // Mostra task attivi, in pausa o appena completati
+        const relevantTasks = tasks.filter(t => ['starting', 'downloading', 'converting', 'tagging', 'pending', 'paused'].includes(t.status));
+
+        if (!relevantTasks.length) {
+            wrapper.style.display = 'none';
+            container.innerHTML = '';
             return;
         }
 
+        wrapper.style.display = 'block';
+        if (countSpan) countSpan.textContent = relevantTasks.length;
         container.innerHTML = '';
-        tasks.forEach(task => {
-            const item = document.createElement('div');
-            item.className = 'drawer-task-item';
+
+        relevantTasks.forEach(task => {
+            const card = document.createElement('div');
+            card.className = 'active-task-card';
 
             const isMp3 = task.format === 'mp3';
             const fmtClass = isMp3 ? 'fmt-mp3' : 'fmt-mp4';
@@ -581,91 +594,68 @@ const app = {
             let statusLabel = 'In preparazione...';
             let barModifier = '';
             if (task.status === 'downloading') {
-                statusLabel = `Scaricamento (${progress}%)`;
+                statusLabel = `Scaricamento stream (${progress}%)`;
             } else if (task.status === 'paused') {
                 statusLabel = `In Pausa (${progress}%)`;
                 barModifier = 'bar-paused';
             } else if (task.status === 'converting') {
-                statusLabel = isMp3 ? 'Conversione audio 320 kbps...' : 'Fusione video MP4...';
+                statusLabel = isMp3 ? 'Conversione audio a 320 kbps con FFmpeg...' : 'Fusione video HD e audio Hi-Fi...';
             } else if (task.status === 'tagging') {
-                statusLabel = 'Applicazione tag ID3 & cover...';
-            } else if (task.status === 'finished') {
-                statusLabel = '✓ Completato con successo';
-                barModifier = 'bar-finished';
-            } else if (task.status === 'cancelled') {
-                statusLabel = '⏹️ Annullato dall\'utente';
-                barModifier = 'bar-cancelled';
-            } else if (task.status === 'error') {
-                statusLabel = `⚠️ Errore: ${task.error || 'Download fallito'}`;
-                barModifier = 'bar-error';
+                statusLabel = 'Applicazione tag ID3 e copertina...';
             }
 
-            const speedEta = (task.speed || task.eta) ? `<span>${task.speed}</span> <span>${task.eta}</span>` : `<span>${statusLabel}</span>`;
+            const speedEta = (task.speed || task.eta) ? `<span>Velocità: ${task.speed || '--'} | Tempo: ${task.eta || '--'}</span>` : `<span>${statusLabel}</span>`;
 
             // Action buttons
             let actionButtonsHtml = '';
             if (['downloading', 'starting', 'pending'].includes(task.status)) {
                 actionButtonsHtml += `
-                    <button class="drawer-action-btn drawer-btn-pause" onclick="app.pauseTask('${task.task_id}')">
-                        ⏸️ Pausa
+                    <button class="task-ctrl-btn pause-ctrl" onclick="app.pauseTask('${task.task_id}')">
+                        ⏸️ Metti in Pausa
                     </button>
-                    <button class="drawer-action-btn drawer-btn-cancel" onclick="app.cancelTask('${task.task_id}')">
-                        ⏹️ Annulla
+                    <button class="task-ctrl-btn cancel-ctrl" onclick="app.cancelTask('${task.task_id}')">
+                        ⏹️ Annulla & Libera Memoria
                     </button>
                 `;
             } else if (task.status === 'paused') {
                 actionButtonsHtml += `
-                    <button class="drawer-action-btn drawer-btn-resume" onclick="app.resumeTask('${task.task_id}')">
-                        ▶️ Riprendi
+                    <button class="task-ctrl-btn resume-ctrl" onclick="app.resumeTask('${task.task_id}')">
+                        ▶️ Riprendi Download
                     </button>
-                    <button class="drawer-action-btn drawer-btn-cancel" onclick="app.cancelTask('${task.task_id}')">
-                        ⏹️ Annulla
-                    </button>
-                `;
-            } else if (task.status === 'finished') {
-                const encodedName = encodeURIComponent(task.filename);
-                actionButtonsHtml += `
-                    <a class="drawer-action-btn drawer-btn-download" href="/api/files/download/${encodedName}" download="${task.filename}">
-                        📥 Salva
-                    </a>
-                    <button class="drawer-action-btn drawer-btn-dismiss" onclick="app.dismissTask('${task.task_id}')">
-                        ✕ Chiudi
-                    </button>
-                `;
-            } else {
-                actionButtonsHtml += `
-                    <button class="drawer-action-btn drawer-btn-dismiss" onclick="app.dismissTask('${task.task_id}')">
-                        ✕ Rimuovi
+                    <button class="task-ctrl-btn cancel-ctrl" onclick="app.cancelTask('${task.task_id}')">
+                        ⏹️ Annulla & Libera Memoria
                     </button>
                 `;
             }
 
-            item.innerHTML = `
-                <div class="drawer-task-top">
-                    <img class="drawer-task-thumb" src="${task.thumbnail_url || '/static/icons/logo.png'}" onerror="this.src='/static/icons/logo.png'" />
-                    <div class="drawer-task-info">
-                        <div class="drawer-task-title" title="${task.title}">${task.title}</div>
-                        <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <span class="drawer-task-artist">${task.artist || 'Artista'}</span>
-                            <span class="drawer-task-fmt ${fmtClass}">${fmtLabel}</span>
+            card.innerHTML = `
+                <div class="active-task-header">
+                    <img class="active-task-thumb" src="${task.thumbnail_url || '/static/icons/logo.png'}" onerror="this.src='/static/icons/logo.png'" />
+                    <div class="active-task-info">
+                        <div class="active-task-title-row">
+                            <span class="active-task-title" title="${task.title}">${task.title}</span>
+                            <span class="active-task-fmt ${fmtClass}">${fmtLabel}</span>
                         </div>
+                        <span class="active-task-artist">${task.artist || 'Artista'}</span>
                     </div>
                 </div>
-                <div class="drawer-task-progress-wrap">
-                    <div class="drawer-progress-track">
-                        <div class="drawer-progress-bar ${barModifier}" style="width: ${progress}%;"></div>
+
+                <div class="active-task-progress-box">
+                    <div class="active-progress-track">
+                        <div class="active-progress-bar ${barModifier}" style="width: ${progress}%;"></div>
                     </div>
-                    <div class="drawer-task-submeta">
+                    <div class="active-task-meta-row">
                         ${speedEta}
-                        <span>${progress}%</span>
+                        <strong>${progress}%</strong>
                     </div>
                 </div>
-                <div class="drawer-task-actions">
+
+                <div class="active-task-controls">
                     ${actionButtonsHtml}
                 </div>
             `;
 
-            container.appendChild(item);
+            container.appendChild(card);
         });
     },
 
@@ -675,7 +665,6 @@ const app = {
         const progressBox = document.getElementById('downloadProgressBox');
         if (!progressBox) return;
 
-        // Trova se c'è un task per questo videoId
         let matchingTask = null;
         if (this.currentDetailTaskId && this.activeTasks.has(this.currentDetailTaskId)) {
             matchingTask = this.activeTasks.get(this.currentDetailTaskId);
@@ -839,47 +828,12 @@ const app = {
         }
     },
 
-    // CONTROLLI CASSETTO GLOBALE (DRAWER)
-    toggleDownloadsDrawer() {
-        const drawer = document.getElementById('globalDownloadsDrawer');
-        if (!drawer) return;
-        if (drawer.style.display === 'none' || !drawer.style.display) {
-            this.openDownloadsDrawer();
-        } else {
-            this.closeDownloadsDrawer();
-        }
-    },
-
-    openDownloadsDrawer() {
-        const drawer = document.getElementById('globalDownloadsDrawer');
-        if (drawer) {
-            drawer.style.display = 'flex';
-            drawer.classList.remove('minimized');
-            document.getElementById('drawerMinimizeIcon').textContent = '▼';
-        }
-    },
-
-    closeDownloadsDrawer() {
-        const drawer = document.getElementById('globalDownloadsDrawer');
-        if (drawer) {
-            drawer.style.display = 'none';
-        }
-    },
-
-    toggleDrawerMinimize() {
-        const drawer = document.getElementById('globalDownloadsDrawer');
-        const icon = document.getElementById('drawerMinimizeIcon');
-        if (!drawer) return;
-
-        const isMin = drawer.classList.toggle('minimized');
-        icon.textContent = isMin ? '▲' : '▼';
-    },
-
-    // DOWNLOADED FILES MANAGER (CON EVENT LISTENER SICURO PER OGNI CARATTERE/APOSTROFO)
+    // DOWNLOADED FILES MANAGER
     async loadFiles() {
         const container = document.getElementById('filesListContainer');
         const loading = document.getElementById('filesLoading');
         const emptyState = document.getElementById('filesEmpty');
+        const completedSpan = document.getElementById('completedFilesCount');
 
         container.innerHTML = '';
         loading.style.display = 'block';
@@ -894,9 +848,11 @@ const app = {
             if (data.success && data.files && data.files.length > 0) {
                 this.renderFilesList(container, data.files);
                 this.updateBadge(data.files.length);
+                if (completedSpan) completedSpan.textContent = data.files.length;
             } else {
                 emptyState.style.display = 'block';
                 this.updateBadge(0);
+                if (completedSpan) completedSpan.textContent = '0';
             }
         } catch (err) {
             loading.style.display = 'none';
@@ -914,7 +870,6 @@ const app = {
             const typeClass = isMp3 ? 'type-mp3' : 'type-mp4';
             const encodedName = encodeURIComponent(file.filename);
 
-            // Costruzione card tramite nodi DOM puliti per eliminare bug di escaping apici
             const infoGroup = document.createElement('div');
             infoGroup.className = 'file-info-group';
 
@@ -958,11 +913,10 @@ const app = {
             deleteBtn.innerHTML = `
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"></polyline>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
                 </svg>
                 <span>Elimina</span>
             `;
-            // Listener sicuro in closure (gestisce apostrofi, virgolette e spazi senza errori)
             deleteBtn.addEventListener('click', () => {
                 app.deleteFile(file.filename);
             });

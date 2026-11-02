@@ -28,19 +28,16 @@
                         </svg>
                         <span>Canzoni Popolari</span>
                     </button>
-                    <button class="nav-btn" id="navDownloadsBtn" onclick="app.toggleDownloadsDrawer()">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                        </svg>
-                        <span>Attività</span>
-                        <span class="badge-count nav-active-badge" id="activeTasksBadge" style="display:none;">0</span>
-                    </button>
                     <button class="nav-btn" id="navFilesBtn" onclick="app.showFiles()">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                         </svg>
                         <span>I Miei Download</span>
                         <span class="badge-count" id="filesCountBadge">0</span>
+                        <span class="nav-live-indicator" id="navLiveIndicator" style="display:none;" title="Download in corso">
+                            <span class="live-dot"></span>
+                            <span id="navLiveText">1 in corso</span>
+                        </span>
                     </button>
                 </nav>
             </div>
@@ -362,12 +359,12 @@
                 </div>
             </section>
 
-            <!-- 4. MY DOWNLOADS SECTION -->
+            <!-- 4. MY DOWNLOADS SECTION (TUTTO UNIFICATO IN UN'UNICA SEZIONE DOWNLOAD) -->
             <section id="filesSection" class="view-section" style="display:none;">
                 <div class="section-header">
                     <div>
                         <h2 class="section-title">📂 I Miei Download</h2>
-                        <p class="section-desc">Tutti i brani e i video salvati sul server e sul tuo computer</p>
+                        <p class="section-desc">Monitora i download in tempo reale e gestisci tutti i file scaricati</p>
                     </div>
                     <div class="files-header-actions">
                         <button class="danger-outline-btn" id="deleteAllFilesBtn" onclick="app.deleteAllFiles()">
@@ -386,57 +383,50 @@
                     </div>
                 </div>
 
-                <div id="filesLoading" class="loading-state" style="display:none;">
-                    <div class="big-spinner"></div>
-                    <p>Caricamento file...</p>
+                <!-- SUB-SECTION 1: DOWNLOAD ATTIVI E IN PAUSA -->
+                <div id="activeDownloadsWrapper" class="active-downloads-panel" style="display:none;">
+                    <div class="sub-section-header">
+                        <div class="sub-header-left">
+                            <div class="pulse-dot-active"></div>
+                            <h3 class="sub-section-title">Download in Corso (<span id="activeDownloadsCount">0</span>)</h3>
+                        </div>
+                        <button class="clear-tasks-btn" onclick="app.clearFinishedTasks()">
+                            Pulisci terminati
+                        </button>
+                    </div>
+                    <div id="activeTasksListContainer" class="active-tasks-grid">
+                        <!-- Populated dynamically via JS -->
+                    </div>
                 </div>
 
-                <div id="filesEmpty" class="empty-state" style="display:none;">
-                    <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12 0c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zM9 10l12-3"/>
-                    </svg>
-                    <h3>Nessun file scaricato ancora</h3>
-                    <p>Cerca una canzone o sfoglia i brani popolari per scaricare il tuo primo MP3 o MP4.</p>
-                    <button class="primary-btn" onclick="app.showPopular()">Esplora Canzoni Popolari</button>
-                </div>
+                <!-- SUB-SECTION 2: FILE COMPLETATI SALVATI SU DISCO -->
+                <div class="completed-downloads-panel">
+                    <div class="sub-section-header" style="margin-top: 10px; margin-bottom: 12px;">
+                        <h3 class="sub-section-title completed-title">
+                            File Scaricati su Disco (<span id="completedFilesCount">0</span>)
+                        </h3>
+                    </div>
 
-                <div id="filesListContainer" class="files-list">
-                    <!-- Populated dynamically via JS -->
+                    <div id="filesLoading" class="loading-state" style="display:none;">
+                        <div class="big-spinner"></div>
+                        <p>Caricamento file...</p>
+                    </div>
+
+                    <div id="filesEmpty" class="empty-state" style="display:none;">
+                        <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12 0c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zM9 10l12-3"/>
+                        </svg>
+                        <h3>Nessun file scaricato ancora</h3>
+                        <p>Cerca una canzone o sfoglia i brani popolari per scaricare il tuo primo MP3 o MP4.</p>
+                        <button class="primary-btn" onclick="app.showPopular()">Esplora Canzoni Popolari</button>
+                    </div>
+
+                    <div id="filesListContainer" class="files-list">
+                        <!-- Populated dynamically via JS -->
+                    </div>
                 </div>
             </section>
         </main>
-
-        <!-- GLOBAL PERSISTENT DOWNLOADS DRAWER -->
-        <div id="globalDownloadsDrawer" class="downloads-drawer" style="display:none;">
-            <div class="drawer-header" onclick="app.toggleDrawerMinimize()">
-                <div class="drawer-title-group">
-                    <div class="drawer-pulse-icon" id="drawerPulseIcon">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2">
-                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                        </svg>
-                    </div>
-                    <span class="drawer-title">Attività di Download</span>
-                    <span class="drawer-badge" id="drawerActiveCountBadge">0 attivi</span>
-                </div>
-                <div class="drawer-controls" onclick="event.stopPropagation()">
-                    <button class="drawer-btn" id="drawerMinimizeBtn" title="Riduci/Espandi" onclick="app.toggleDrawerMinimize()">
-                        <span id="drawerMinimizeIcon">▼</span>
-                    </button>
-                    <button class="drawer-btn" title="Chiudi pannello" onclick="app.closeDownloadsDrawer()">✕</button>
-                </div>
-            </div>
-
-            <div class="drawer-body" id="drawerBody">
-                <div id="drawerTasksContainer" class="drawer-tasks-list">
-                    <!-- Populated dynamically via JS with active/recent tasks -->
-                </div>
-                <div class="drawer-footer">
-                    <button class="drawer-clear-btn" onclick="app.clearFinishedTasks()">
-                        Pulisci completati e annullati
-                    </button>
-                </div>
-            </div>
-        </div>
 
         <!-- TOAST NOTIFICATIONS -->
         <div id="toastContainer" class="toast-container"></div>
