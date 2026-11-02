@@ -125,7 +125,25 @@ docker compose down
 
 ---
 
-### Opzione 3: Esecuzione Locale Senza Docker (Python)
+### Opzione 3: Installazione su CasaOS 🏠
+Puoi aggiungere facilmente **MusicDownloader** alla tua dashboard di CasaOS come app personalizzata (o importando direttamente il `docker-compose.yml`):
+
+1. Su CasaOS, apri l'**App Store** e clicca su **Custom Install** (in alto a destra).
+2. Compila i campi della schermata:
+   - **App Name**: `MusicDownloader`
+   - **Icon URL**:
+     ```text
+     https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
+     ```
+     *(oppure in locale: `http://[IP-DEL-TUO-SERVER]:8765/static/icons/logo.png`)*
+   - **Porta Web UI**: `8765`
+   - **Porta Container**: `8765` -> **Porta Host**: `8765`
+   - **Volume Host**: `/DATA/Media/Music` (o la cartella che preferisci) -> **Container**: `/app/downloads`
+3. Clicca su **Submit / Salva**: l'icona ufficiale apparirà subito nella dashboard di CasaOS!
+
+---
+
+### Opzione 4: Esecuzione Locale Senza Docker (Python)
 Se preferisci eseguire l'app direttamente in Python sul tuo computer:
 
 ```bash

@@ -64,6 +64,14 @@ body {
     user-select: none;
 }
 
+.brand-logo-img {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-sm);
+    object-fit: cover;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+}
+
 .logo-icon {
     width: 42px;
     height: 42px;
