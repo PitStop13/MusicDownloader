@@ -3,14 +3,18 @@ const app = {
     currentView: 'popular',
     previousView: 'popular',
     currentTrack: null,
-    pollInterval: null,
+    currentDetailTaskId: null,
     searchDebounceTimer: null,
     searchAbortController: null,
     searchSeq: 0,
+    tasksPollerTimer: null,
+    activeTasks: new Map(),
+    downloadedTaskIds: new Set(),
 
     init() {
         this.loadPopular(this.currentCountry);
         this.updateFilesCount();
+        this.startTasksPoller();
 
         const searchInput = document.getElementById('searchInput');
         const clearBtn = document.getElementById('clearSearchBtn');
@@ -155,7 +159,6 @@ const app = {
         clearTimeout(this.searchDebounceTimer);
         const query = val.trim();
 
-        // Se la barra è vuota, torna automaticamente alla vista dei brani popolari
         if (!query) {
             if (this.searchAbortController) {
                 this.searchAbortController.abort();
@@ -168,12 +171,10 @@ const app = {
             return;
         }
 
-        // Se l'utente ha scritto almeno 3 caratteri (o ha incollato un link http)
         if (query.length >= 3 || query.startsWith('http')) {
             const spinner = document.getElementById('searchSpinner');
             if (spinner) spinner.style.display = 'block';
 
-            // Debounce di 320ms per digitazione fluida senza sovraccaricare il server
             this.searchDebounceTimer = setTimeout(() => {
                 this.handleSearch(false);
             }, 320);
@@ -185,7 +186,6 @@ const app = {
         const query = document.getElementById('searchInput').value.trim();
         if (!query) return;
 
-        // Annulla eventuali chiamate precedenti ancora in volo
         if (this.searchAbortController) {
             this.searchAbortController.abort();
         }
@@ -213,7 +213,6 @@ const app = {
             });
             const data = await res.json();
 
-            // Ignora risposte di vecchie digitazioni superate
             if (currentSeq !== this.searchSeq) return;
 
             loading.style.display = 'none';
@@ -250,7 +249,7 @@ const app = {
     // RENDER SONG CARDS
     renderCards(container, items) {
         container.innerHTML = '';
-        items.forEach((item, index) => {
+        items.forEach((item) => {
             const card = document.createElement('div');
             card.className = 'song-card';
             card.onclick = () => this.openDetails(item.id);
@@ -282,7 +281,7 @@ const app = {
         });
     },
 
-    // RESET PREVIEW PLAYER (FIX STATO E DOPPIO CLICK)
+    // RESET PREVIEW PLAYER
     resetPreviewPlayer() {
         const container = document.getElementById('previewEmbedContainer');
         const iframe = document.getElementById('previewIframe');
@@ -329,7 +328,7 @@ const app = {
             `;
         } else {
             container.style.display = 'none';
-            iframe.src = ''; // stop immediato dell'audio
+            iframe.src = '';
             btn.innerHTML = `
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
@@ -346,14 +345,13 @@ const app = {
         const card = document.getElementById('detailsCard');
         const progressBox = document.getElementById('downloadProgressBox');
 
-        // Reset completo dello stato e del player
         loading.style.display = 'block';
         card.style.display = 'none';
         progressBox.style.display = 'none';
         document.getElementById('progressSuccessActions').style.display = 'none';
 
-        // Ripristina pulito il player anteprima (chiuso e tasto su 'Ascolta Anteprima')
         this.resetPreviewPlayer();
+        this.currentDetailTaskId = null;
 
         try {
             const res = await fetch(`/api/details/${videoId}`);
@@ -386,6 +384,26 @@ const app = {
             // Badge risoluzione massima
             document.getElementById('detailMaxVideoRes').textContent = `Massima Risoluzione (${data.max_video_quality})`;
 
+            // Rilevamento Video Ufficiale (Fix copertina statica)
+            const offBadgeWrapper = document.getElementById('officialVideoBadgeWrapper');
+            const offNote = document.getElementById('officialVideoNote');
+            const mp4BtnText = document.getElementById('downloadMp4BtnText');
+
+            if (data.is_art_track && data.has_official_video) {
+                offBadgeWrapper.style.display = 'block';
+                offNote.style.display = 'block';
+                mp4BtnText.textContent = 'Scarica Video Ufficiale (MP4 HD)';
+            } else if (!data.is_art_track) {
+                offBadgeWrapper.style.display = 'none';
+                offNote.style.display = 'none';
+                mp4BtnText.textContent = 'Scarica Filmato Video (MP4)';
+            } else {
+                offBadgeWrapper.style.display = 'none';
+                offNote.style.display = 'block';
+                offNote.textContent = 'Traccia audio originale fornita con copertina alta risoluzione.';
+                mp4BtnText.textContent = 'Scarica Filmato Video (MP4)';
+            }
+
             // Album
             const albumWrapper = document.getElementById('metaAlbumWrapper');
             if (data.album) {
@@ -407,6 +425,9 @@ const app = {
             // Assegna il link embed pulito al player
             document.getElementById('previewIframe').dataset.embedUrl = data.embed_url;
 
+            // Se c'è già un task attivo per questa canzone, aggancialo alla barra di avanzamento
+            this.syncDetailsTaskWithActive();
+
         } catch (err) {
             loading.style.display = 'none';
             this.showToast('Errore di connessione durante il recupero dei dettagli', 'error');
@@ -426,7 +447,6 @@ const app = {
         const statusText = document.getElementById('progressStatusText');
         const successActions = document.getElementById('progressSuccessActions');
 
-        // Disabilita pulsanti durante l'elaborazione
         mp3Btn.disabled = true;
         mp4Btn.disabled = true;
         progressBox.style.display = 'block';
@@ -437,21 +457,27 @@ const app = {
         progressBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
         try {
+            const payload = {
+                id_or_url: this.currentTrack.id,
+                format: format,
+                title: this.currentTrack.title,
+                artist: this.currentTrack.artist,
+                thumbnail: this.currentTrack.thumbnail,
+                official_video_id: this.currentTrack.official_video_id || null
+            };
+
             const res = await fetch('/api/download', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    id_or_url: this.currentTrack.id,
-                    format: format,
-                    title: this.currentTrack.title,
-                    artist: this.currentTrack.artist,
-                    thumbnail: this.currentTrack.thumbnail
-                })
+                body: JSON.stringify(payload)
             });
 
             const data = await res.json();
             if (data.success && data.task_id) {
-                this.pollTask(data.task_id, format);
+                this.currentDetailTaskId = data.task_id;
+                this.openDownloadsDrawer();
+                this.showToast(`Download avviato: ${this.currentTrack.title}`, 'info');
+                this.pollActiveTasks();
             } else {
                 throw new Error('Errore durante l\'avvio dell\'elaborazione');
             }
@@ -463,84 +489,393 @@ const app = {
         }
     },
 
-    // POLL DOWNLOAD PROGRESS
-    pollTask(taskId, format) {
-        if (this.pollInterval) clearInterval(this.pollInterval);
+    // GLOBAL TASKS POLLER (PERSISTENTE IN BACKGROUND TRA LE PAGINE)
+    startTasksPoller() {
+        if (this.tasksPollerTimer) clearInterval(this.tasksPollerTimer);
+        this.pollActiveTasks();
+        this.tasksPollerTimer = setInterval(() => {
+            this.pollActiveTasks();
+        }, 1100);
+    },
 
-        const mp3Btn = document.getElementById('downloadMp3Btn');
-        const mp4Btn = document.getElementById('downloadMp4Btn');
+    async pollActiveTasks() {
+        try {
+            const res = await fetch('/api/tasks');
+            const data = await res.json();
+            if (!data.success || !data.tasks) return;
+
+            const tasks = data.tasks;
+            this.activeTasks.clear();
+            tasks.forEach(t => this.activeTasks.set(t.task_id, t));
+
+            // Conteggio attivi (non terminati)
+            const runningTasks = tasks.filter(t => ['starting', 'downloading', 'converting', 'tagging', 'pending', 'paused'].includes(t.status));
+            const activeOnly = tasks.filter(t => ['starting', 'downloading', 'converting', 'tagging', 'pending'].includes(t.status));
+
+            // Aggiorna Badge nella Navbar
+            const navBadge = document.getElementById('activeTasksBadge');
+            if (navBadge) {
+                if (activeOnly.length > 0) {
+                    navBadge.style.display = 'inline-block';
+                    navBadge.textContent = activeOnly.length;
+                } else {
+                    navBadge.style.display = 'none';
+                }
+            }
+
+            // Aggiorna Badge nel Drawer
+            const drawerBadge = document.getElementById('drawerActiveCountBadge');
+            if (drawerBadge) {
+                drawerBadge.textContent = `${activeOnly.length} in corso (${tasks.length} totali)`;
+            }
+
+            // Rendi render degli elementi nel drawer
+            this.renderDrawerTasks(tasks);
+
+            // Sincronizza la vista dettagli se aperta
+            this.syncDetailsTaskWithActive();
+
+            // Notifica e trigger download per task appena completati
+            tasks.forEach(t => {
+                if (t.status === 'finished' && !this.downloadedTaskIds.has(t.task_id)) {
+                    this.downloadedTaskIds.add(t.task_id);
+                    this.showToast(`✓ Download completato: ${t.filename}`, 'success');
+                    this.updateFilesCount();
+
+                    // Trigger salvataggio automatico nel browser
+                    const encodedName = encodeURIComponent(t.filename);
+                    const triggerLink = document.createElement('a');
+                    triggerLink.href = `/api/files/download/${encodedName}`;
+                    triggerLink.download = t.filename;
+                    document.body.appendChild(triggerLink);
+                    triggerLink.click();
+                    document.body.removeChild(triggerLink);
+                }
+            });
+
+        } catch (err) {
+            console.error('Error polling tasks:', err);
+        }
+    },
+
+    // RENDER TASKS NEL CASSETTO GLOBALE PERSISTENTE
+    renderDrawerTasks(tasks) {
+        const container = document.getElementById('drawerTasksContainer');
+        if (!container) return;
+
+        if (!tasks.length) {
+            container.innerHTML = `<div style="text-align:center; padding: 20px; color: var(--text-dim); font-size: 0.85rem;">Nessuna attività recente di download.</div>`;
+            return;
+        }
+
+        container.innerHTML = '';
+        tasks.forEach(task => {
+            const item = document.createElement('div');
+            item.className = 'drawer-task-item';
+
+            const isMp3 = task.format === 'mp3';
+            const fmtClass = isMp3 ? 'fmt-mp3' : 'fmt-mp4';
+            const fmtLabel = isMp3 ? 'MP3 320K' : 'MP4 VIDEO';
+            const progress = Math.round(task.progress || 0);
+
+            let statusLabel = 'In preparazione...';
+            let barModifier = '';
+            if (task.status === 'downloading') {
+                statusLabel = `Scaricamento (${progress}%)`;
+            } else if (task.status === 'paused') {
+                statusLabel = `In Pausa (${progress}%)`;
+                barModifier = 'bar-paused';
+            } else if (task.status === 'converting') {
+                statusLabel = isMp3 ? 'Conversione audio 320 kbps...' : 'Fusione video MP4...';
+            } else if (task.status === 'tagging') {
+                statusLabel = 'Applicazione tag ID3 & cover...';
+            } else if (task.status === 'finished') {
+                statusLabel = '✓ Completato con successo';
+                barModifier = 'bar-finished';
+            } else if (task.status === 'cancelled') {
+                statusLabel = '⏹️ Annullato dall\'utente';
+                barModifier = 'bar-cancelled';
+            } else if (task.status === 'error') {
+                statusLabel = `⚠️ Errore: ${task.error || 'Download fallito'}`;
+                barModifier = 'bar-error';
+            }
+
+            const speedEta = (task.speed || task.eta) ? `<span>${task.speed}</span> <span>${task.eta}</span>` : `<span>${statusLabel}</span>`;
+
+            // Action buttons
+            let actionButtonsHtml = '';
+            if (['downloading', 'starting', 'pending'].includes(task.status)) {
+                actionButtonsHtml += `
+                    <button class="drawer-action-btn drawer-btn-pause" onclick="app.pauseTask('${task.task_id}')">
+                        ⏸️ Pausa
+                    </button>
+                    <button class="drawer-action-btn drawer-btn-cancel" onclick="app.cancelTask('${task.task_id}')">
+                        ⏹️ Annulla
+                    </button>
+                `;
+            } else if (task.status === 'paused') {
+                actionButtonsHtml += `
+                    <button class="drawer-action-btn drawer-btn-resume" onclick="app.resumeTask('${task.task_id}')">
+                        ▶️ Riprendi
+                    </button>
+                    <button class="drawer-action-btn drawer-btn-cancel" onclick="app.cancelTask('${task.task_id}')">
+                        ⏹️ Annulla
+                    </button>
+                `;
+            } else if (task.status === 'finished') {
+                const encodedName = encodeURIComponent(task.filename);
+                actionButtonsHtml += `
+                    <a class="drawer-action-btn drawer-btn-download" href="/api/files/download/${encodedName}" download="${task.filename}">
+                        📥 Salva
+                    </a>
+                    <button class="drawer-action-btn drawer-btn-dismiss" onclick="app.dismissTask('${task.task_id}')">
+                        ✕ Chiudi
+                    </button>
+                `;
+            } else {
+                actionButtonsHtml += `
+                    <button class="drawer-action-btn drawer-btn-dismiss" onclick="app.dismissTask('${task.task_id}')">
+                        ✕ Rimuovi
+                    </button>
+                `;
+            }
+
+            item.innerHTML = `
+                <div class="drawer-task-top">
+                    <img class="drawer-task-thumb" src="${task.thumbnail_url || '/static/icons/logo.png'}" onerror="this.src='/static/icons/logo.png'" />
+                    <div class="drawer-task-info">
+                        <div class="drawer-task-title" title="${task.title}">${task.title}</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span class="drawer-task-artist">${task.artist || 'Artista'}</span>
+                            <span class="drawer-task-fmt ${fmtClass}">${fmtLabel}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="drawer-task-progress-wrap">
+                    <div class="drawer-progress-track">
+                        <div class="drawer-progress-bar ${barModifier}" style="width: ${progress}%;"></div>
+                    </div>
+                    <div class="drawer-task-submeta">
+                        ${speedEta}
+                        <span>${progress}%</span>
+                    </div>
+                </div>
+                <div class="drawer-task-actions">
+                    ${actionButtonsHtml}
+                </div>
+            `;
+
+            container.appendChild(item);
+        });
+    },
+
+    // SINCRONIZZAZIONE DELLA SCHEDA DETTAGLI CON I CONTROLLI DEL TASK
+    syncDetailsTaskWithActive() {
+        if (!this.currentTrack) return;
+        const progressBox = document.getElementById('downloadProgressBox');
+        if (!progressBox) return;
+
+        // Trova se c'è un task per questo videoId
+        let matchingTask = null;
+        if (this.currentDetailTaskId && this.activeTasks.has(this.currentDetailTaskId)) {
+            matchingTask = this.activeTasks.get(this.currentDetailTaskId);
+        } else {
+            for (const t of this.activeTasks.values()) {
+                if (t.url_or_id === this.currentTrack.id && ['downloading', 'starting', 'paused', 'converting', 'tagging'].includes(t.status)) {
+                    matchingTask = t;
+                    this.currentDetailTaskId = t.task_id;
+                    break;
+                }
+            }
+        }
+
+        if (!matchingTask) return;
+
+        progressBox.style.display = 'block';
         const progressBar = document.getElementById('progressBarFill');
         const percentText = document.getElementById('progressPercentText');
         const statusText = document.getElementById('progressStatusText');
         const speedText = document.getElementById('progressSpeedText');
         const etaText = document.getElementById('progressEtaText');
         const successActions = document.getElementById('progressSuccessActions');
-        const browserDownloadBtn = document.getElementById('browserDownloadBtn');
+        const mp3Btn = document.getElementById('downloadMp3Btn');
+        const mp4Btn = document.getElementById('downloadMp4Btn');
+        const pauseBtn = document.getElementById('detailPauseBtn');
+        const resumeBtn = document.getElementById('detailResumeBtn');
+        const cancelBtn = document.getElementById('detailCancelBtn');
 
-        this.pollInterval = setInterval(async () => {
-            try {
-                const res = await fetch(`/api/task/${taskId}`);
-                const data = await res.json();
+        const p = Math.round(matchingTask.progress || 0);
+        progressBar.style.width = `${p}%`;
+        percentText.textContent = `${p}%`;
 
-                if (!data.success || !data.task) return;
+        if (matchingTask.speed) speedText.textContent = `Velocità: ${matchingTask.speed}`;
+        if (matchingTask.eta) etaText.textContent = `Tempo rimasto: ${matchingTask.eta}`;
 
-                const task = data.task;
-                const progress = task.progress || 0;
-                progressBar.style.width = `${progress}%`;
-                percentText.textContent = `${Math.round(progress)}%`;
+        if (matchingTask.status === 'paused') {
+            statusText.textContent = '⏸️ Download in pausa';
+            pauseBtn.style.display = 'none';
+            resumeBtn.style.display = 'inline-flex';
+            cancelBtn.style.display = 'inline-flex';
+        } else if (matchingTask.status === 'downloading') {
+            statusText.textContent = 'Scaricamento stream da sorgente...';
+            pauseBtn.style.display = 'inline-flex';
+            resumeBtn.style.display = 'none';
+            cancelBtn.style.display = 'inline-flex';
+        } else if (matchingTask.status === 'converting') {
+            statusText.textContent = matchingTask.format === 'mp3' ? 'Conversione audio a 320 kbps con FFmpeg...' : 'Fusione stream video e audio HD...';
+            pauseBtn.style.display = 'none';
+            resumeBtn.style.display = 'none';
+        } else if (matchingTask.status === 'tagging') {
+            statusText.textContent = 'Incorporamento tag ID3 e copertina nel file...';
+            pauseBtn.style.display = 'none';
+            resumeBtn.style.display = 'none';
+        } else if (matchingTask.status === 'finished') {
+            statusText.textContent = '✓ File pronto per l\'ascolto e il salvataggio!';
+            successActions.style.display = 'block';
+            pauseBtn.style.display = 'none';
+            resumeBtn.style.display = 'none';
+            cancelBtn.style.display = 'none';
+            mp3Btn.disabled = false;
+            mp4Btn.disabled = false;
 
-                if (task.speed) speedText.textContent = `Velocità: ${task.speed}`;
-                if (task.eta) etaText.textContent = `Tempo rimasto: ${task.eta}`;
-
-                if (task.status === 'downloading') {
-                    statusText.textContent = `Scaricamento stream da sorgente...`;
-                } else if (task.status === 'converting') {
-                    statusText.textContent = format === 'mp3' 
-                        ? `Conversione audio a 320 kbps con FFmpeg...` 
-                        : `Fusione video HD e traccia audio ad alta fedeltà...`;
-                } else if (task.status === 'tagging') {
-                    statusText.textContent = `Incorporamento tag ID3 e copertina nel file...`;
-                } else if (task.status === 'finished') {
-                    clearInterval(this.pollInterval);
-                    progressBar.style.width = '100%';
-                    percentText.textContent = '100%';
-                    statusText.textContent = 'File pronto per l\'ascolto e il salvataggio!';
-                    speedText.textContent = `Dimensione: ${(task.file_size / (1024 * 1024)).toFixed(2)} MB`;
-                    etaText.textContent = `Completato`;
-
-                    const encodedName = encodeURIComponent(task.filename);
-                    const fileUrl = `/api/files/download/${encodedName}`;
-                    browserDownloadBtn.href = fileUrl;
-                    browserDownloadBtn.setAttribute('download', task.filename);
-
-                    successActions.style.display = 'block';
-                    mp3Btn.disabled = false;
-                    mp4Btn.disabled = false;
-
-                    this.showToast(`Download completato: ${task.filename}`, 'success');
-                    this.updateFilesCount();
-
-                    // Trigger salvataggio automatico nel browser
-                    const triggerLink = document.createElement('a');
-                    triggerLink.href = fileUrl;
-                    triggerLink.download = task.filename;
-                    document.body.appendChild(triggerLink);
-                    triggerLink.click();
-                    document.body.removeChild(triggerLink);
-                } else if (task.status === 'error') {
-                    clearInterval(this.pollInterval);
-                    statusText.textContent = `Errore: ${task.error || 'Download fallito'}`;
-                    mp3Btn.disabled = false;
-                    mp4Btn.disabled = false;
-                    this.showToast('Errore durante il download', 'error');
-                }
-            } catch (err) {
-                console.error(err);
-            }
-        }, 900);
+            const browserDownloadBtn = document.getElementById('browserDownloadBtn');
+            const encodedName = encodeURIComponent(matchingTask.filename);
+            browserDownloadBtn.href = `/api/files/download/${encodedName}`;
+            browserDownloadBtn.setAttribute('download', matchingTask.filename);
+        } else if (matchingTask.status === 'cancelled') {
+            statusText.textContent = '⏹️ Download annullato. Memoria liberata.';
+            pauseBtn.style.display = 'none';
+            resumeBtn.style.display = 'none';
+            cancelBtn.style.display = 'none';
+            mp3Btn.disabled = false;
+            mp4Btn.disabled = false;
+        } else if (matchingTask.status === 'error') {
+            statusText.textContent = `⚠️ Errore: ${matchingTask.error || 'Download fallito'}`;
+            pauseBtn.style.display = 'none';
+            resumeBtn.style.display = 'none';
+            cancelBtn.style.display = 'none';
+            mp3Btn.disabled = false;
+            mp4Btn.disabled = false;
+        }
     },
 
-    // DOWNLOADED FILES MANAGER
+    // CONTROLLI TASK: PAUSA, RIPRENDI, ANNULLA, RIMUOVI
+    async pauseTask(taskId) {
+        try {
+            const res = await fetch(`/api/task/${taskId}/pause`, { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                this.showToast('Download messo in pausa', 'info');
+                this.pollActiveTasks();
+            } else {
+                this.showToast(data.detail || 'Impossibile mettere in pausa', 'error');
+            }
+        } catch (err) {
+            this.showToast('Errore di connessione', 'error');
+        }
+    },
+
+    async resumeTask(taskId) {
+        try {
+            const res = await fetch(`/api/task/${taskId}/resume`, { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                this.showToast('Download ripreso', 'success');
+                this.pollActiveTasks();
+            } else {
+                this.showToast(data.detail || 'Impossibile riprendere', 'error');
+            }
+        } catch (err) {
+            this.showToast('Errore di connessione', 'error');
+        }
+    },
+
+    async cancelTask(taskId) {
+        try {
+            const res = await fetch(`/api/task/${taskId}/cancel`, { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                this.showToast('Download annullato e memoria liberata', 'info');
+                this.pollActiveTasks();
+            } else {
+                this.showToast(data.detail || 'Impossibile annullare', 'error');
+            }
+        } catch (err) {
+            this.showToast('Errore durante l\'annullamento', 'error');
+        }
+    },
+
+    async dismissTask(taskId) {
+        try {
+            await fetch(`/api/task/${taskId}`, { method: 'DELETE' });
+            this.activeTasks.delete(taskId);
+            this.pollActiveTasks();
+        } catch (err) {}
+    },
+
+    async clearFinishedTasks() {
+        for (const [taskId, task] of this.activeTasks.entries()) {
+            if (['finished', 'cancelled', 'error'].includes(task.status)) {
+                await this.dismissTask(taskId);
+            }
+        }
+    },
+
+    pauseCurrentTask() {
+        if (this.currentDetailTaskId) {
+            this.pauseTask(this.currentDetailTaskId);
+        }
+    },
+
+    resumeCurrentTask() {
+        if (this.currentDetailTaskId) {
+            this.resumeTask(this.currentDetailTaskId);
+        }
+    },
+
+    cancelCurrentTask() {
+        if (this.currentDetailTaskId) {
+            this.cancelTask(this.currentDetailTaskId);
+        }
+    },
+
+    // CONTROLLI CASSETTO GLOBALE (DRAWER)
+    toggleDownloadsDrawer() {
+        const drawer = document.getElementById('globalDownloadsDrawer');
+        if (!drawer) return;
+        if (drawer.style.display === 'none' || !drawer.style.display) {
+            this.openDownloadsDrawer();
+        } else {
+            this.closeDownloadsDrawer();
+        }
+    },
+
+    openDownloadsDrawer() {
+        const drawer = document.getElementById('globalDownloadsDrawer');
+        if (drawer) {
+            drawer.style.display = 'flex';
+            drawer.classList.remove('minimized');
+            document.getElementById('drawerMinimizeIcon').textContent = '▼';
+        }
+    },
+
+    closeDownloadsDrawer() {
+        const drawer = document.getElementById('globalDownloadsDrawer');
+        if (drawer) {
+            drawer.style.display = 'none';
+        }
+    },
+
+    toggleDrawerMinimize() {
+        const drawer = document.getElementById('globalDownloadsDrawer');
+        const icon = document.getElementById('drawerMinimizeIcon');
+        if (!drawer) return;
+
+        const isMin = drawer.classList.toggle('minimized');
+        icon.textContent = isMin ? '▲' : '▼';
+    },
+
+    // DOWNLOADED FILES MANAGER (CON EVENT LISTENER SICURO PER OGNI CARATTERE/APOSTROFO)
     async loadFiles() {
         const container = document.getElementById('filesListContainer');
         const loading = document.getElementById('filesLoading');
@@ -579,35 +914,64 @@ const app = {
             const typeClass = isMp3 ? 'type-mp3' : 'type-mp4';
             const encodedName = encodeURIComponent(file.filename);
 
-            item.innerHTML = `
-                <div class="file-info-group">
-                    <div class="file-type-icon ${typeClass}">
-                        ${file.format.toUpperCase()}
-                    </div>
-                    <div class="file-meta">
-                        <div class="file-title" title="${file.filename}">${file.filename}</div>
-                        <div class="file-submeta">
-                            <span>📦 ${file.size_mb} MB</span>
-                            <span>🕒 ${file.created_at}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="file-actions">
-                    <a class="file-action-btn" href="/api/files/download/${encodedName}" download="${file.filename}">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                        </svg>
-                        <span>Scarica</span>
-                    </a>
-                    <button class="file-action-btn delete-btn" onclick="app.deleteFile('${file.filename}')">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                        <span>Elimina</span>
-                    </button>
-                </div>
+            // Costruzione card tramite nodi DOM puliti per eliminare bug di escaping apici
+            const infoGroup = document.createElement('div');
+            infoGroup.className = 'file-info-group';
+
+            const iconDiv = document.createElement('div');
+            iconDiv.className = `file-type-icon ${typeClass}`;
+            iconDiv.textContent = file.format.toUpperCase();
+
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'file-meta';
+
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'file-title';
+            titleDiv.title = file.filename;
+            titleDiv.textContent = file.filename;
+
+            const submetaDiv = document.createElement('div');
+            submetaDiv.className = 'file-submeta';
+            submetaDiv.innerHTML = `<span>📦 ${file.size_mb} MB</span> <span>🕒 ${file.created_at}</span>`;
+
+            metaDiv.appendChild(titleDiv);
+            metaDiv.appendChild(submetaDiv);
+            infoGroup.appendChild(iconDiv);
+            infoGroup.appendChild(metaDiv);
+
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'file-actions';
+
+            const downloadLink = document.createElement('a');
+            downloadLink.className = 'file-action-btn';
+            downloadLink.href = `/api/files/download/${encodedName}`;
+            downloadLink.download = file.filename;
+            downloadLink.innerHTML = `
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                <span>Scarica</span>
             `;
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'file-action-btn delete-btn';
+            deleteBtn.innerHTML = `
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                <span>Elimina</span>
+            `;
+            // Listener sicuro in closure (gestisce apostrofi, virgolette e spazi senza errori)
+            deleteBtn.addEventListener('click', () => {
+                app.deleteFile(file.filename);
+            });
+
+            actionsDiv.appendChild(downloadLink);
+            actionsDiv.appendChild(deleteBtn);
+
+            item.appendChild(infoGroup);
+            item.appendChild(actionsDiv);
             container.appendChild(item);
         });
     },
@@ -622,11 +986,31 @@ const app = {
             if (data.success) {
                 this.showToast('File eliminato con successo', 'success');
                 this.loadFiles();
+                this.updateFilesCount();
             } else {
                 this.showToast(data.detail || 'Impossibile eliminare il file', 'error');
             }
         } catch (err) {
             this.showToast('Errore durante l\'eliminazione', 'error');
+        }
+    },
+
+    async deleteAllFiles() {
+        if (!confirm('Sei sicuro di voler eliminare TUTTI i file salvati nella cartella download del server? L\'azione è irreversibile.')) return;
+
+        try {
+            const res = await fetch('/api/files', { method: 'DELETE' });
+            const data = await res.json();
+
+            if (data.success) {
+                this.showToast(`Eliminati ${data.deleted_count} file con successo`, 'success');
+                this.loadFiles();
+                this.updateFilesCount();
+            } else {
+                this.showToast(data.detail || 'Errore durante la pulizia', 'error');
+            }
+        } catch (err) {
+            this.showToast('Errore di connessione', 'error');
         }
     },
 

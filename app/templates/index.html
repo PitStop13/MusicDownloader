@@ -28,6 +28,13 @@
                         </svg>
                         <span>Canzoni Popolari</span>
                     </button>
+                    <button class="nav-btn" id="navDownloadsBtn" onclick="app.toggleDownloadsDrawer()">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                        </svg>
+                        <span>Attività</span>
+                        <span class="badge-count nav-active-badge" id="activeTasksBadge" style="display:none;">0</span>
+                    </button>
                     <button class="nav-btn" id="navFilesBtn" onclick="app.showFiles()">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
@@ -59,10 +66,10 @@
                             id="searchInput" 
                             placeholder="Cerca titolo, artista, oppure incolla link YouTube / Spotify..."
                             autocomplete="off"
-                            onkeydown="if(event.key==='Enter') app.handleSearch()"
+                            onkeydown="if(event.key==='Enter') app.handleSearch(true)"
                         />
                         <button class="clear-btn" id="clearSearchBtn" onclick="app.clearSearch()" style="display:none;">✕</button>
-                        <button class="search-submit-btn" id="searchSubmitBtn" onclick="app.handleSearch()">
+                        <button class="search-submit-btn" id="searchSubmitBtn" onclick="app.handleSearch(true)">
                             <span>Cerca</span>
                             <div class="spinner" id="searchSpinner" style="display:none;"></div>
                         </button>
@@ -166,6 +173,13 @@
                                 <span class="duration-badge" id="detailDuration">0:00</span>
                             </div>
 
+                            <!-- Official Video Badge if detected -->
+                            <div id="officialVideoBadgeWrapper" style="display:none; margin: 8px 0;">
+                                <span class="official-clip-badge" id="officialVideoBadge">
+                                    🎬 Video Musicale Ufficiale Riconosciuto
+                                </span>
+                            </div>
+
                             <h1 class="song-title" id="detailTitle">Titolo Canzone</h1>
                             <p class="artist-name" id="detailArtist">
                                 <span id="detailArtistName">Nome Artista</span>
@@ -263,6 +277,7 @@
                                     <div>
                                         <h4 class="card-title">Filmato Video MP4</h4>
                                         <span class="card-subtitle" id="detailMaxVideoRes">Massima Qualità (HD / 4K)</span>
+                                        <p class="official-video-note" id="officialVideoNote" style="display:none;">🎬 Scaricherà il videoclip ufficiale HD/4K con audio sincronizzato.</p>
                                     </div>
                                 </div>
 
@@ -285,12 +300,12 @@
                                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2">
                                         <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                                     </svg>
-                                    <span>Scarica Filmato Video (MP4)</span>
+                                    <span id="downloadMp4BtnText">Scarica Filmato Video (MP4)</span>
                                 </button>
                             </div>
                         </div>
 
-                        <!-- LIVE DOWNLOAD PROGRESS CARD -->
+                        <!-- LIVE DOWNLOAD PROGRESS CARD (ON DETAILS PAGE) -->
                         <div id="downloadProgressBox" class="progress-box" style="display:none;">
                             <div class="progress-box-header">
                                 <div class="progress-title-row">
@@ -309,6 +324,19 @@
                                 <span id="progressEtaText">Tempo rimanente: --</span>
                             </div>
 
+                            <!-- TASK CONTROLS ON DETAILS VIEW -->
+                            <div class="task-action-buttons-row" id="progressControlsRow">
+                                <button class="task-ctrl-btn pause-ctrl" id="detailPauseBtn" onclick="app.pauseCurrentTask()">
+                                    ⏸️ Metti in Pausa
+                                </button>
+                                <button class="task-ctrl-btn resume-ctrl" id="detailResumeBtn" onclick="app.resumeCurrentTask()" style="display:none;">
+                                    ▶️ Riprendi
+                                </button>
+                                <button class="task-ctrl-btn cancel-ctrl" id="detailCancelBtn" onclick="app.cancelCurrentTask()">
+                                    ⏹️ Annulla & Libera Memoria
+                                </button>
+                            </div>
+
                             <!-- SUCCESS BANNER -->
                             <div id="progressSuccessActions" class="success-actions" style="display:none;">
                                 <div class="success-msg">
@@ -325,7 +353,7 @@
                                         <span>Scarica subito nel browser</span>
                                     </a>
                                     <button class="view-files-link-btn" onclick="app.showFiles()">
-                                        <span>Apri cartella Download dell'app</span>
+                                        <span>Apri I Miei Download</span>
                                     </button>
                                 </div>
                             </div>
@@ -341,12 +369,21 @@
                         <h2 class="section-title">📂 I Miei Download</h2>
                         <p class="section-desc">Tutti i brani e i video salvati sul server e sul tuo computer</p>
                     </div>
-                    <button class="refresh-files-btn" onclick="app.loadFiles()">
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-                        </svg>
-                        <span>Aggiorna</span>
-                    </button>
+                    <div class="files-header-actions">
+                        <button class="danger-outline-btn" id="deleteAllFilesBtn" onclick="app.deleteAllFiles()">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+                            </svg>
+                            <span>Svuota Cartella</span>
+                        </button>
+                        <button class="refresh-files-btn" onclick="app.loadFiles()">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                            </svg>
+                            <span>Aggiorna</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div id="filesLoading" class="loading-state" style="display:none;">
@@ -368,6 +405,38 @@
                 </div>
             </section>
         </main>
+
+        <!-- GLOBAL PERSISTENT DOWNLOADS DRAWER -->
+        <div id="globalDownloadsDrawer" class="downloads-drawer" style="display:none;">
+            <div class="drawer-header" onclick="app.toggleDrawerMinimize()">
+                <div class="drawer-title-group">
+                    <div class="drawer-pulse-icon" id="drawerPulseIcon">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                        </svg>
+                    </div>
+                    <span class="drawer-title">Attività di Download</span>
+                    <span class="drawer-badge" id="drawerActiveCountBadge">0 attivi</span>
+                </div>
+                <div class="drawer-controls" onclick="event.stopPropagation()">
+                    <button class="drawer-btn" id="drawerMinimizeBtn" title="Riduci/Espandi" onclick="app.toggleDrawerMinimize()">
+                        <span id="drawerMinimizeIcon">▼</span>
+                    </button>
+                    <button class="drawer-btn" title="Chiudi pannello" onclick="app.closeDownloadsDrawer()">✕</button>
+                </div>
+            </div>
+
+            <div class="drawer-body" id="drawerBody">
+                <div id="drawerTasksContainer" class="drawer-tasks-list">
+                    <!-- Populated dynamically via JS with active/recent tasks -->
+                </div>
+                <div class="drawer-footer">
+                    <button class="drawer-clear-btn" onclick="app.clearFinishedTasks()">
+                        Pulisci completati e annullati
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- TOAST NOTIFICATIONS -->
         <div id="toastContainer" class="toast-container"></div>

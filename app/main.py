@@ -15,9 +15,15 @@ from app.music_service import (
 from app.downloader import (
     start_download_task,
     get_task,
+    get_all_tasks,
+    pause_download_task,
+    resume_download_task,
+    cancel_download_task,
+    delete_task,
     list_downloaded_files,
     get_safe_file_path,
-    delete_file
+    delete_file,
+    delete_all_files
 )
 
 app = FastAPI(
@@ -41,6 +47,7 @@ class DownloadRequest(BaseModel):
     title: Optional[str] = None
     artist: Optional[str] = None
     thumbnail: Optional[str] = None
+    official_video_id: Optional[str] = None
 
 
 @app.get("/", response_class=FileResponse)
@@ -102,7 +109,8 @@ async def api_download(req: DownloadRequest):
         output_format=fmt,
         title=req.title,
         artist=req.artist,
-        thumbnail_url=req.thumbnail
+        thumbnail_url=req.thumbnail,
+        official_video_id=req.official_video_id
     )
 
     return {
@@ -110,6 +118,17 @@ async def api_download(req: DownloadRequest):
         "task_id": task_id,
         "status": "pending",
         "format": fmt
+    }
+
+
+@app.get("/api/tasks")
+async def api_get_all_tasks():
+    """Retrieve all active and recent download tasks."""
+    tasks = get_all_tasks()
+    return {
+        "success": True,
+        "count": len(tasks),
+        "tasks": tasks
     }
 
 
@@ -125,6 +144,54 @@ async def api_task_status(task_id: str):
     }
 
 
+@app.post("/api/task/{task_id}/pause")
+async def api_task_pause(task_id: str):
+    """Pause an active download task."""
+    success = pause_download_task(task_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Impossibile mettere in pausa l'attività (non attiva o già terminata).")
+    return {
+        "success": True,
+        "message": "Download messo in pausa."
+    }
+
+
+@app.post("/api/task/{task_id}/resume")
+async def api_task_resume(task_id: str):
+    """Resume a paused download task."""
+    success = resume_download_task(task_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Impossibile riprendere l'attività (non in pausa).")
+    return {
+        "success": True,
+        "message": "Download ripreso con successo."
+    }
+
+
+@app.post("/api/task/{task_id}/cancel")
+async def api_task_cancel(task_id: str):
+    """Cancel an active or paused download task and clean up partial files."""
+    success = cancel_download_task(task_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Attività non trovata.")
+    return {
+        "success": True,
+        "message": "Download annullato e memoria liberata."
+    }
+
+
+@app.delete("/api/task/{task_id}")
+async def api_task_delete(task_id: str):
+    """Remove task from active tracker list."""
+    success = delete_task(task_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Attività non trovata.")
+    return {
+        "success": True,
+        "message": "Attività rimossa."
+    }
+
+
 @app.get("/api/files")
 async def api_list_files():
     """List all downloaded files saved on the server."""
@@ -135,6 +202,17 @@ async def api_list_files():
         "count": len(files),
         "total_size_mb": round(total_size, 2),
         "files": files
+    }
+
+
+@app.delete("/api/files")
+async def api_delete_all_files():
+    """Delete all downloaded files from server storage."""
+    deleted_count = delete_all_files()
+    return {
+        "success": True,
+        "deleted_count": deleted_count,
+        "message": f"Eliminati {deleted_count} file con successo."
     }
 
 

@@ -50,14 +50,24 @@
   - Conversione ad alta fedeltà a **320 kbps con FFmpeg**.
   - **Copertina HD incorporata** direttamente nel file MP3 (tag ID3v2 APIC).
   - **Tag ID3 completi** (Titolo, Artista, Album) per una visualizzazione perfetta su autoradio, iPhone, Android e lettori MP3.
-- 🎬 **Download Video MP4 (Massima Risoluzione HD / 4K)**:
+- 🎬 **Download Video MP4 con Rilevamento Intelligente del Videoclip Ufficiale**:
+  - Risolve il problema dei brani YouTube Music / Topic / Spotify: anziché scaricare un'immagine statica con audio, il motore **individua automaticamente il vero videoclip musicale ufficiale in HD / 4K**!
   - Fusione con FFmpeg del flusso video a massima risoluzione (1080p, 1440p, 4K) e della traccia audio ad alta fedeltà.
   - File MP4 universale compatibile con PC, Smart TV e smartphone.
+- 📥 **Pannello Globale Persistente dei Download (Drawer fluttuante)**:
+  - Tutti i download rimangono sempre visibili e monitorabili in tempo reale tramite un pratico cassetto fluttuante e un badge animato nella barra di navigazione.
+  - Puoi navigare tra le pagine, cercare altre canzoni o esplorare le classifiche: **i download continuano fluidamente in background senza interrompersi mai**.
+- ⏯️ **Controllo Totale del Download (Pausa, Ripresa, Annullamento & Pulizia)**:
+  - **Pausa**: sospendi qualsiasi download in corso salvaguardando i byte scaricati fino a quel momento.
+  - **Ripresa dal punto esatto**: riparti istantaneamente dal punto e byte in cui era stato interrotto senza riscaricare tutto da capo.
+  - **Annulla & Libera Memoria**: interrompe il processo e rimuove automaticamente i file temporanei `.part`, liberando subito memoria RAM e spazio disco.
 - 📁 **Salvataggio Automatico sul Computer & Download nel Browser**:
   - Tutti i file scaricati finiscono istantaneamente nella cartella locale `./downloads` del tuo computer grazie al volume montato in Docker.
   - Pulsante per il download diretto nel browser se accedi da smartphone o altri dispositivi connessi alla rete locale.
-- 📂 **Gestore "I Miei Download"**:
-  - Visualizza tutti i file scaricati con dimensione e data, riproducili ed eliminali con un click.
+- 📂 **Gestore "I Miei Download" & Svuotamento Rapido**:
+  - Visualizza tutti i file scaricati con dimensione e data.
+  - Eliminazione sicura di singoli brani anche con apostrofi e caratteri speciali nel nome.
+  - Pulsante **"Svuota Cartella"** per eliminare l'intero archivio con un click.
 
 ---
 
@@ -240,7 +250,7 @@ MusicDownloader/
 ├── assets/                    # Logo PNG, banner SVG e anteprime grafiche per CasaOS
 ├── downloads/                 # Cartella volume montata sul tuo PC con i file scaricati
 ├── tests/
-│   └── test_suite.py          # Suite di test automatizzati end-to-end (8 test)
+│   └── test_suite.py          # Suite di test automatizzati end-to-end (11 test)
 ├── Dockerfile                 # Immagine Debian con Python 3.11, FFmpeg e Node.js
 ├── docker-compose.yml         # Configurazione Docker Compose con schema x-casaos
 ├── docker-compose.template.yml# Template CasaOS per installazione rapida con 1-click
