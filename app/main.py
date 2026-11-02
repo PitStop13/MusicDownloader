@@ -50,6 +50,7 @@ class DownloadRequest(BaseModel):
     artist: Optional[str] = None
     thumbnail: Optional[str] = None
     official_video_id: Optional[str] = None
+    client_id: Optional[str] = None
 
 
 @app.get("/", response_class=FileResponse)
@@ -112,7 +113,8 @@ async def api_download(req: DownloadRequest):
         title=req.title,
         artist=req.artist,
         thumbnail_url=req.thumbnail,
-        official_video_id=req.official_video_id
+        official_video_id=req.official_video_id,
+        client_id=req.client_id
     )
 
     return {
@@ -124,9 +126,9 @@ async def api_download(req: DownloadRequest):
 
 
 @app.get("/api/tasks")
-async def api_get_all_tasks():
-    """Retrieve all active and recent download tasks."""
-    tasks = get_all_tasks()
+async def api_get_all_tasks(client_id: Optional[str] = Query(None)):
+    """Retrieve all active and recent download tasks, optionally filtered by client_id."""
+    tasks = get_all_tasks(client_id=client_id)
     return {
         "success": True,
         "count": len(tasks),

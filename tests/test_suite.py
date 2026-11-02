@@ -12,6 +12,7 @@ Tests all features:
 9. Art Track Detection & Official Music Video Resolution
 10. Task Pause, Resume, Cancel & Memory Cleanup
 11. Client-Only Storage Integrity & Temporary File Wipe
+12. Mobile Responsive HTML & Cross-Device Download Isolation
 """
 import os
 import sys
@@ -295,6 +296,45 @@ def test_pause_resume_cancel_and_memory_cleanup():
     assert not any(t["task_id"] == task_id for t in tasks_after)
     print(" -> PASSED: Full task control lifecycle (pause, resume, cancel, delete) verified!")
 
+def test_mobile_and_cross_device_isolation():
+    print("[TEST 12] Testing Mobile Responsive Meta & Cross-Device Isolation...")
+    # 1. Verify Mobile Meta Tags
+    r_home = requests.get(f"{BASE_URL}/", timeout=5)
+    assert r_home.status_code == 200
+    assert "viewport-fit=cover" in r_home.text, "Missing viewport-fit=cover for mobile notches"
+    assert "theme-color" in r_home.text, "Missing mobile theme-color meta tag"
+    assert "nav-text-mobile" in r_home.text, "Missing responsive mobile nav elements"
+    print(" -> Mobile responsive viewport and PWA meta tags verified.")
+
+    # 2. Verify Cross-Device Download Isolation
+    device_a = "client_device_pc_test"
+    device_b = "client_device_phone_test"
+
+    # Device A starts a task
+    r_task = requests.post(f"{BASE_URL}/api/download", json={
+        "id_or_url": "dQw4w9WgXcQ",
+        "format": "mp3",
+        "title": "Cross Device Privacy Verification",
+        "artist": "Test Artist",
+        "client_id": device_a
+    }, timeout=10)
+    assert r_task.status_code == 200
+    task_id = r_task.json()["task_id"]
+
+    # Device A polls its tasks
+    tasks_a = requests.get(f"{BASE_URL}/api/tasks?client_id={device_a}", timeout=5).json().get("tasks", [])
+    assert any(t["task_id"] == task_id for t in tasks_a), "Device A could not see its own task"
+    print(" -> Device A correctly sees its initiated download.")
+
+    # Device B (e.g. Phone) polls its tasks
+    tasks_b = requests.get(f"{BASE_URL}/api/tasks?client_id={device_b}", timeout=5).json().get("tasks", [])
+    assert not any(t["task_id"] == task_id for t in tasks_b), "CRITICAL LEAK: Device B (Phone) saw Device A (PC) task!"
+    print(" -> Verified: Device B (Phone) is 100% isolated and cannot see or re-download Device A's tasks!")
+
+    # Clean up task
+    requests.delete(f"{BASE_URL}/api/task/{task_id}", timeout=5)
+    print(" -> PASSED: Mobile responsiveness and cross-device isolation verified!")
+
 def test_delete_single_and_bulk_files():
     print("[TEST 11] Testing Client-Only Storage Integrity & Temporary File Wipe...")
     r_files = requests.get(f"{BASE_URL}/api/files", timeout=5)
@@ -317,7 +357,7 @@ if __name__ == "__main__":
         except Exception:
             pass
     print("=" * 60)
-    print("[TEST SUITE] AVVIO SUITE COMPLETA DI TEST AUTOMATIZZATI (11 TEST)")
+    print("[TEST SUITE] AVVIO SUITE COMPLETA DI TEST AUTOMATIZZATI (12 TEST)")
     print("=" * 60)
     test_health()
     test_home_page()
@@ -330,6 +370,7 @@ if __name__ == "__main__":
     test_art_track_and_official_video_detection()
     test_pause_resume_cancel_and_memory_cleanup()
     test_delete_single_and_bulk_files()
+    test_mobile_and_cross_device_isolation()
     print("=" * 60)
-    print("[SUCCESS] TUTTI GLI 11 TEST COMPLETATI CON SUCCESSO! ZERO ERRORI.")
+    print("[SUCCESS] TUTTI I 12 TEST COMPLETATI CON SUCCESSO! ZERO ERRORI.")
     print("=" * 60)

@@ -11,6 +11,51 @@ const app = {
     activeTasks: new Map(),
     downloadedTaskIds: new Set(),
 
+    // Identificatore univoco del dispositivo (Client-Side scoping)
+    getClientId() {
+        let id = localStorage.getItem('md_client_id');
+        if (!id) {
+            id = 'cli_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
+            localStorage.setItem('md_client_id', id);
+        }
+        return id;
+    },
+
+    // Task avviati da questo specifico browser/dispositivo
+    getMyInitiatedTasks() {
+        try {
+            const raw = localStorage.getItem('md_my_tasks');
+            return raw ? new Set(JSON.parse(raw)) : new Set();
+        } catch (e) {
+            return new Set();
+        }
+    },
+
+    addMyInitiatedTask(taskId) {
+        const tasks = this.getMyInitiatedTasks();
+        tasks.add(taskId);
+        const arr = Array.from(tasks).slice(-300);
+        localStorage.setItem('md_my_tasks', JSON.stringify(arr));
+    },
+
+    // Task già salvati/scaricati nel browser di questo dispositivo
+    getDownloadedTasks() {
+        try {
+            const raw = localStorage.getItem('md_downloaded_tasks');
+            return raw ? new Set(JSON.parse(raw)) : new Set();
+        } catch (e) {
+            return new Set();
+        }
+    },
+
+    markTaskAsDownloaded(taskId) {
+        const tasks = this.getDownloadedTasks();
+        tasks.add(taskId);
+        const arr = Array.from(tasks).slice(-300);
+        localStorage.setItem('md_downloaded_tasks', JSON.stringify(arr));
+        this.downloadedTaskIds.add(taskId);
+    },
+
     init() {
         this.loadPopular(this.currentCountry);
         this.updateFilesCount();
@@ -457,13 +502,15 @@ const app = {
         progressBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
         try {
+            const clientId = this.getClientId();
             const payload = {
                 id_or_url: this.currentTrack.id,
                 format: format,
                 title: this.currentTrack.title,
                 artist: this.currentTrack.artist,
                 thumbnail: this.currentTrack.thumbnail,
-                official_video_id: this.currentTrack.official_video_id || null
+                official_video_id: this.currentTrack.official_video_id || null,
+                client_id: clientId
             };
 
             const res = await fetch('/api/download', {
@@ -475,6 +522,7 @@ const app = {
             const data = await res.json();
             if (data.success && data.task_id) {
                 this.currentDetailTaskId = data.task_id;
+                this.addMyInitiatedTask(data.task_id); // Registra che QUESTO dispositivo ha avviato il download
                 this.showToast(`Download avviato! Controllalo in "I Miei Download"`, 'info');
                 this.pollActiveTasks();
             } else {
@@ -499,7 +547,8 @@ const app = {
 
     async pollActiveTasks() {
         try {
-            const res = await fetch('/api/tasks');
+            const clientId = this.getClientId();
+            const res = await fetch(`/api/tasks?client_id=${encodeURIComponent(clientId)}`);
             const data = await res.json();
             if (!data.success || !data.tasks) return;
 
@@ -507,7 +556,7 @@ const app = {
             this.activeTasks.clear();
             tasks.forEach(t => this.activeTasks.set(t.task_id, t));
 
-            // Filtro task attivi/in corso
+            // Filtro task attivi/in corso per questo client
             const activeOnly = tasks.filter(t => ['starting', 'downloading', 'converting', 'tagging', 'pending', 'paused'].includes(t.status));
 
             // Aggiorna indicatore dinamico "in corso" nella Navbar accanto a "I Miei Download"
@@ -532,17 +581,25 @@ const app = {
                 this.syncDetailsTaskWithActive();
             }
 
-            // Notifica e trigger download per task appena completati
-            tasks.forEach(t => {
-                if (t.status === 'finished' && !this.downloadedTaskIds.has(t.task_id)) {
-                    this.downloadedTaskIds.add(t.task_id);
-                    this.showToast(`✓ Download completato: ${t.filename}`, 'success');
-                    this.updateFilesCount();
+            // Notifica e trigger download:
+            // ATTENZIONE: IL BROWSER DEVE SCARICARE AUTOMATICAMENTE IL FILE SOLO SE:
+            // 1. Lo stato del task è 'finished'
+            // 2. QUESTO specifico dispositivo ha avviato il download (myInitiated.has)
+            // 3. Non è già stato scaricato in precedenza su questo dispositivo (!downloaded.has)
+            // 4. Il server non ha già eliminato il file (!t.server_cleaned)
+            const myInitiated = this.getMyInitiatedTasks();
+            const downloaded = this.getDownloadedTasks();
 
-                    // Se siamo nella pagina dei download, aggiorna subito l'elenco dei file scaricati
-                    if (this.currentView === 'files') {
-                        this.loadFiles();
-                    }
+            tasks.forEach(t => {
+                if (
+                    t.status === 'finished' &&
+                    myInitiated.has(t.task_id) &&
+                    !downloaded.has(t.task_id) &&
+                    !this.downloadedTaskIds.has(t.task_id) &&
+                    !t.server_cleaned
+                ) {
+                    this.markTaskAsDownloaded(t.task_id);
+                    this.showToast(`✓ Conversione completata: ${t.filename}`, 'success');
 
                     // Trigger salvataggio automatico diretto nel browser (Client-Side)
                     const triggerLink = document.createElement('a');
@@ -552,6 +609,10 @@ const app = {
                     triggerLink.click();
                     document.body.removeChild(triggerLink);
                     this.showToast(`✓ File inviato al browser e salvato sul tuo dispositivo: ${t.filename}`, 'success');
+
+                    if (this.currentView === 'files') {
+                        this.renderActiveTasksSection();
+                    }
                 }
             });
 
@@ -623,6 +684,19 @@ const app = {
                     </button>
                     <button class="task-ctrl-btn cancel-ctrl" onclick="app.cancelTask('${task.task_id}')">
                         ⏹️ Annulla & Libera Memoria
+                    </button>
+                `;
+            } else if (task.status === 'finished') {
+                actionButtonsHtml += `
+                    <span class="task-saved-badge">✓ Salvato sul tuo dispositivo</span>
+                    <button class="task-ctrl-btn dismiss-ctrl" onclick="app.dismissTask('${task.task_id}')">
+                        ✕ Rimuovi
+                    </button>
+                `;
+            } else if (['cancelled', 'error'].includes(task.status)) {
+                actionButtonsHtml += `
+                    <button class="task-ctrl-btn dismiss-ctrl" onclick="app.dismissTask('${task.task_id}')">
+                        ✕ Rimuovi
                     </button>
                 `;
             }

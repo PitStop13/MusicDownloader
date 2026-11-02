@@ -69,6 +69,14 @@
   - Un'unica sezione intuitiva che mostra l'avanzamento dei download attivi, velocità (MB/s), tempo rimanente e stato di completamento.
   - Download trigger automatico nel browser al 100% con notifica a comparsa.
   - Badge dinamico nella barra di navigazione con conteggio live delle conversioni in corso.
+- 📱 **Ottimizzazione Mobile & UI Responsive (Touch-friendly)**:
+  - Layout moderno a **2 colonne** per smartphone con copertine 1:1, ispirato alla user-experience di Spotify e YouTube Music.
+  - Prevenzione automatica del fastidioso zoom su iOS Safari (`font-size: 16px` sul campo di ricerca).
+  - Chip dei suggerimenti e bandiere delle nazioni con scorrimento orizzontale tattile (`swipe`).
+  - Pulsanti con ampie aree di tocco touch (min. 44px) e supporto a notch e Safe Area (`viewport-fit=cover`).
+- 🔒 **Isolamento Multidispositivo Intelligente (Zero Re-Download Fantasma)**:
+  - Ogni client (PC, smartphone o tablet) riceve un identificatore univoco e gestisce **esclusivamente i download avviati da quel browser**.
+  - Aprendo il link dell'app da smartphone dopo aver scaricato musica dal computer, il telefono **non proverà mai a riscaricare brani o video scaricati in precedenza dal PC**.
 
 ---
 

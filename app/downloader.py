@@ -50,9 +50,13 @@ def get_raw_task(task_id: str) -> Optional[Dict[str, Any]]:
         return _TASKS.get(task_id)
 
 
-def get_all_tasks() -> List[Dict[str, Any]]:
+def get_all_tasks(client_id: Optional[str] = None) -> List[Dict[str, Any]]:
     with _LOCK:
-        tasks = [serialize_task(t) for t in _TASKS.values()]
+        tasks = []
+        for t in _TASKS.values():
+            if client_id and t.get("client_id") and t.get("client_id") != client_id:
+                continue
+            tasks.append(serialize_task(t))
         tasks.sort(key=lambda x: x.get("created_at", 0), reverse=True)
         return tasks
 
@@ -404,7 +408,8 @@ def start_download_task(
     title: Optional[str] = None,
     artist: Optional[str] = None,
     thumbnail_url: Optional[str] = None,
-    official_video_id: Optional[str] = None
+    official_video_id: Optional[str] = None,
+    client_id: Optional[str] = None
 ) -> str:
     """Initiate an asynchronous download task with pause/resume/cancel tracking."""
     task_id = str(uuid.uuid4())
@@ -415,6 +420,7 @@ def start_download_task(
 
     task_data = {
         "task_id": task_id,
+        "client_id": client_id,
         "url_or_id": video_id_or_url,
         "format": fmt,
         "title": title or "Download",
