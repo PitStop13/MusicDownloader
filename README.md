@@ -41,13 +41,12 @@
 - 🔥 **Classifiche e Canzoni Popolari in Tempo Reale**:
   - Selettore istantaneo per nazione: 🇮🇹 **Italia**, 🌍 **Globale**, 🇺🇸 **USA**, 🇬🇧 **UK**, 🇪🇸 **Spagna**.
   - Card moderne con copertina HD, titolo, artista, durata e badge di posizione (#1, #2, ...).
-- 📄 **Pagina Dettagli Canzone Completa & Player Multi-Mode Anti-VPN**:
+- 📄 **Pagina Dettagli Canzone Completa & Player Multi-Mode**:
   - Copertina ad altissima risoluzione con bagliore atmosferico.
   - Artista verificato, durata, visualizzazioni, data di uscita e album.
-  - **Player Multi-Mode con Protezione VPN**:
-    - **🎵 Audio Diretto (Zero Restrizioni VPN)**: streaming audio nativo HTML5 dal server con seek/scrubber interattivo, tempo trascorso e durata totale. Bypassa al 100% i blocchi di YouTube per utenti con VPN o brani con restrizioni di embed senza mostrare *"Guarda su YouTube"*.
-    - **🎬 Video YouTube**: embed ottimizzato con parametri di origine e policy corrette.
-    - **🛡️ Video Proxy (Anti-VPN)**: player alternativo Invidious per guardare il video liberamente anche se YouTube blocca l'IP della tua VPN.
+  - **Player Multimediale con Layout Responsive 16:9**:
+    - **🎵 Audio Diretto (Stream Nativo HQ)**: player audio con estetica glassmorphism moderna, equalizzatore a onde animate in tempo reale, scrubber interattivo e streaming HTTP 206 diretto dal server. Bypassa al 100% qualsiasi restrizione o blocco VPN/embed di YouTube.
+    - **🎬 Video Ufficiale YouTube**: player video responsive in formato cinematografico 16:9 senza tagli o compressioni sia su desktop che su smartphone, con link diretto per aprirlo su YouTube.
 - ⏳ **Coda Sequenziale Automatica dei Download**:
   - Se clicchi per scaricare un brano e subito dopo un video o un'altra canzone, il secondo viene inserito automaticamente in coda: **`⏳ In coda (Posizione #1)`**.
   - Evita sovraccarichi di CPU e FFmpeg sul server/CasaOS e previene il blocco da parte dei browser mobile sui download automatici multipli contemporanei.

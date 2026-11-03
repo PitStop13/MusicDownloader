@@ -115,11 +115,15 @@ const app = {
         audio.addEventListener('play', () => {
             if (playIcon) playIcon.style.display = 'none';
             if (pauseIcon) pauseIcon.style.display = 'block';
+            const eq = document.getElementById('audioEqualizer');
+            if (eq) eq.classList.add('playing');
         });
 
         audio.addEventListener('pause', () => {
             if (playIcon) playIcon.style.display = 'block';
             if (pauseIcon) pauseIcon.style.display = 'none';
+            const eq = document.getElementById('audioEqualizer');
+            if (eq) eq.classList.remove('playing');
         });
 
         audio.addEventListener('ended', () => {
@@ -127,11 +131,13 @@ const app = {
             if (pauseIcon) pauseIcon.style.display = 'none';
             if (progressBar) progressBar.value = 0;
             if (currentTimeSpan) currentTimeSpan.textContent = '0:00';
+            const eq = document.getElementById('audioEqualizer');
+            if (eq) eq.classList.remove('playing');
         });
 
         audio.addEventListener('error', (e) => {
+            if (!audio.src || audio.src === window.location.href || audio.src.endsWith('/')) return;
             console.warn('Audio stream playback notice:', e);
-            this.showToast('Attendi il caricamento dello stream audio o passa al player video.', 'info');
         });
     },
 
@@ -410,6 +416,10 @@ const app = {
 
         if (container) container.style.display = 'none';
         if (btnText) btnText.textContent = 'Ascolta Anteprima';
+        const toggleBtn = document.getElementById('togglePlayerBtn');
+        if (toggleBtn) toggleBtn.classList.remove('active');
+        const eq = document.getElementById('audioEqualizer');
+        if (eq) eq.classList.remove('playing');
 
         this.currentAudioUrl = null;
         this.currentEmbedUrl = null;
@@ -419,6 +429,7 @@ const app = {
     togglePreviewPlayer() {
         const container = document.getElementById('previewEmbedContainer');
         const btnText = document.getElementById('togglePlayerBtnText');
+        const toggleBtn = document.getElementById('togglePlayerBtn');
         if (!container) return;
 
         const isHidden = container.style.display === 'none' || !container.style.display;
@@ -426,7 +437,9 @@ const app = {
         if (isHidden) {
             container.style.display = 'block';
             if (btnText) btnText.textContent = 'Chiudi Anteprima';
+            if (toggleBtn) toggleBtn.classList.add('active');
             this.switchPlayerTab(this.activePlayerTab || 'audio');
+            container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         } else {
             this.resetPreviewPlayer();
         }
@@ -554,6 +567,10 @@ const app = {
 
             const totalDurationSpan = document.getElementById('audioTotalDuration');
             if (totalDurationSpan) totalDurationSpan.textContent = data.duration || '0:00';
+            const audioTrackTitle = document.getElementById('audioTrackTitle');
+            if (audioTrackTitle) audioTrackTitle.textContent = data.title;
+            const ytExternalLink = document.getElementById('ytExternalLink');
+            if (ytExternalLink) ytExternalLink.href = `https://www.youtube.com/watch?v=${data.id}`;
 
             // Popola i dettagli della scheda
             card.style.display = 'block';

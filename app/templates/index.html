@@ -207,80 +207,108 @@
                                 </div>
                             </div>
 
-                            <!-- SMART MULTI-MODE PREVIEW PLAYER (ANTI-VPN / NO YOUTUBE BLOCKS) -->
-                            <div class="preview-player-box">
-                                <div class="preview-header">
-                                    <div class="preview-title-wrap">
-                                        <span class="preview-heading-icon">🎧</span>
-                                        <span class="preview-heading-text">Anteprima Brano & Video</span>
-                                    </div>
-                                    <button class="toggle-player-btn" id="togglePlayerBtn" onclick="app.togglePreviewPlayer()">
-                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                            <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                        </svg>
-                                        <span id="togglePlayerBtnText">Ascolta Anteprima</span>
+                            <!-- PREVIEW LAUNCH ACTION BUTTON -->
+                            <div class="hero-actions-row">
+                                <button class="preview-launch-btn" id="togglePlayerBtn" onclick="app.togglePreviewPlayer()">
+                                    <svg id="togglePlayerIcon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                    </svg>
+                                    <span id="togglePlayerBtnText">Ascolta Anteprima</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- EXPANDABLE FULL-WIDTH PREVIEW SECTION -->
+                    <div id="previewEmbedContainer" class="preview-player-section" style="display:none;">
+                        <div class="preview-player-card">
+                            <div class="preview-player-header">
+                                <div class="preview-title-wrap">
+                                    <span class="preview-heading-icon">🎧</span>
+                                    <span class="preview-heading-text">Anteprima Multimediale</span>
+                                </div>
+
+                                <!-- Clean, compact tabs -->
+                                <div class="player-tabs-bar">
+                                    <button class="player-tab-btn active" id="tabAudioDirect" onclick="app.switchPlayerTab('audio')">
+                                        <span>🎵 Audio Diretto</span>
+                                    </button>
+                                    <button class="player-tab-btn" id="tabVideoYt" onclick="app.switchPlayerTab('video-yt')">
+                                        <span>🎬 Video Ufficiale</span>
+                                    </button>
+                                    <!-- Backwards compatibility tab -->
+                                    <button class="player-tab-btn" id="tabVideoProxy" onclick="app.switchPlayerTab('video-proxy')" style="display:none;">
+                                        <span>🛡️ Mirror</span>
                                     </button>
                                 </div>
 
-                                <div id="previewEmbedContainer" class="preview-embed-container" style="display:none;">
-                                    <!-- PLAYER TABS -->
-                                    <div class="player-tabs-bar">
-                                        <button class="player-tab-btn active" id="tabAudioDirect" onclick="app.switchPlayerTab('audio')">
-                                            <span>🎵 Audio Diretto (Zero Blocchi VPN)</span>
-                                        </button>
-                                        <button class="player-tab-btn" id="tabVideoYt" onclick="app.switchPlayerTab('video-yt')">
-                                            <span>🎬 Video YouTube</span>
-                                        </button>
-                                        <button class="player-tab-btn" id="tabVideoProxy" onclick="app.switchPlayerTab('video-proxy')">
-                                            <span>🛡️ Video Proxy (Anti-VPN)</span>
-                                        </button>
-                                    </div>
+                                <button class="preview-close-btn" onclick="app.resetPreviewPlayer()" title="Chiudi anteprima">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                    </svg>
+                                    <span>Chiudi</span>
+                                </button>
+                            </div>
 
-                                    <!-- 1. DIRECT AUDIO PLAYER (100% immune to VPN and YouTube blocks) -->
-                                    <div id="playerViewAudio" class="player-view-pane active">
-                                        <div class="direct-audio-player">
-                                            <audio id="nativeAudioElement" preload="none"></audio>
-                                            <div class="audio-player-ui">
-                                                <button class="audio-play-btn" id="audioPlayPauseBtn" onclick="app.toggleNativeAudio()" title="Riproduci / Pausa">
-                                                    <svg id="audioPlayIcon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-                                                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                                    </svg>
-                                                    <svg id="audioPauseIcon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" style="display:none;">
-                                                        <rect x="6" y="4" width="4" height="16"></rect>
-                                                        <rect x="14" y="4" width="4" height="16"></rect>
-                                                    </svg>
-                                                </button>
+                            <!-- 1. DIRECT AUDIO PLAYER -->
+                            <div id="playerViewAudio" class="player-view-pane active">
+                                <div class="direct-audio-player">
+                                    <audio id="nativeAudioElement" preload="none"></audio>
+                                    <div class="audio-player-layout">
+                                        <button class="audio-play-btn" id="audioPlayPauseBtn" onclick="app.toggleNativeAudio()" title="Riproduci / Pausa">
+                                            <svg id="audioPlayIcon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                            </svg>
+                                            <svg id="audioPauseIcon" viewBox="0 0 24 24" width="22" height="22" fill="currentColor" style="display:none;">
+                                                <rect x="6" y="4" width="4" height="16" rx="1"></rect>
+                                                <rect x="14" y="4" width="4" height="16" rx="1"></rect>
+                                            </svg>
+                                        </button>
 
-                                                <div class="audio-scrubber-wrap">
-                                                    <div class="audio-time-row">
-                                                        <span id="audioCurrentTime">0:00</span>
-                                                        <span class="audio-anti-vpn-badge">🛡️ Stream Diretto Audio (Senza restrizioni VPN)</span>
-                                                        <span id="audioTotalDuration">0:00</span>
+                                        <div class="audio-controls-center">
+                                            <div class="audio-info-row">
+                                                <div class="audio-track-details">
+                                                    <span class="audio-now-playing" id="audioTrackTitle">Caricamento anteprima...</span>
+                                                    <div class="audio-equalizer" id="audioEqualizer">
+                                                        <span class="eq-bar bar-1"></span>
+                                                        <span class="eq-bar bar-2"></span>
+                                                        <span class="eq-bar bar-3"></span>
+                                                        <span class="eq-bar bar-4"></span>
                                                     </div>
-                                                    <input type="range" id="audioProgressBar" class="audio-range-slider" min="0" max="100" value="0" step="0.1" oninput="app.seekNativeAudio(this.value)" />
                                                 </div>
+                                                <span class="audio-quality-badge">🎧 Stream Diretto HQ</span>
+                                            </div>
+
+                                            <div class="audio-scrubber-row">
+                                                <span class="time-label" id="audioCurrentTime">0:00</span>
+                                                <input type="range" id="audioProgressBar" class="audio-range-slider" min="0" max="100" value="0" step="0.1" oninput="app.seekNativeAudio(this.value)" />
+                                                <span class="time-label" id="audioTotalDuration">0:00</span>
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
 
-                                    <!-- 2. ENHANCED YOUTUBE EMBED -->
-                                    <div id="playerViewYt" class="player-view-pane" style="display:none;">
-                                        <div class="vpn-alert-banner">
-                                            <span>💡 <strong>Nota VPN</strong>: Se vedi <em>"Guarda su YouTube"</em>, YouTube blocca l'embed per il tuo IP. Usa la scheda <strong>"🎵 Audio Diretto"</strong> o <strong>"🛡️ Video Proxy"</strong> per visualizzarlo qui.</span>
-                                        </div>
-                                        <div class="iframe-aspect-ratio">
-                                            <iframe id="previewIframe" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
-                                        </div>
+                            <!-- 2. CLEAN 16:9 VIDEO EMBED -->
+                            <div id="playerViewYt" class="player-view-pane" style="display:none;">
+                                <div class="video-player-container">
+                                    <div class="iframe-aspect-ratio">
+                                        <iframe id="previewIframe" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
                                     </div>
+                                    <div class="video-notice-bar">
+                                        <span>💡 In caso di restrizioni sul player video, passa alla scheda <strong>🎵 Audio Diretto</strong> per un ascolto fluido.</span>
+                                        <a id="ytExternalLink" href="#" target="_blank" rel="noopener noreferrer" class="yt-external-btn">
+                                            Apri su YouTube ↗
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
 
-                                    <!-- 3. INVIDIOUS PROXY VIDEO EMBED -->
-                                    <div id="playerViewProxy" class="player-view-pane" style="display:none;">
-                                        <div class="proxy-notice-bar">
-                                            <span>🛡️ Player video proxy libero (bypassa blocchi YouTube e VPN)</span>
-                                        </div>
-                                        <div class="iframe-aspect-ratio">
-                                            <iframe id="proxyVideoIframe" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" referrerpolicy="no-referrer" allowfullscreen></iframe>
-                                        </div>
+                            <!-- 3. PROXY VIDEO EMBED (FALLBACK/COMPAT) -->
+                            <div id="playerViewProxy" class="player-view-pane" style="display:none;">
+                                <div class="video-player-container">
+                                    <div class="iframe-aspect-ratio">
+                                        <iframe id="proxyVideoIframe" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" referrerpolicy="no-referrer" allowfullscreen></iframe>
                                     </div>
                                 </div>
                             </div>
