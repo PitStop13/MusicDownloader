@@ -11,6 +11,12 @@ const app = {
     activeTasks: new Map(),
     downloadedTaskIds: new Set(),
 
+    // Preview player state
+    activePlayerTab: 'audio',
+    currentAudioUrl: null,
+    currentEmbedUrl: null,
+    currentProxyUrl: null,
+
     // Identificatore univoco del dispositivo (Client-Side scoping)
     getClientId() {
         let id = localStorage.getItem('md_client_id');
@@ -60,6 +66,7 @@ const app = {
         this.loadPopular(this.currentCountry);
         this.updateFilesCount();
         this.startTasksPoller();
+        this.initAudioPlayerEvents();
 
         const searchInput = document.getElementById('searchInput');
         const clearBtn = document.getElementById('clearSearchBtn');
@@ -79,6 +86,61 @@ const app = {
                 app.handleSearch(true);
             }
         });
+    },
+
+    initAudioPlayerEvents() {
+        const audio = document.getElementById('nativeAudioElement');
+        if (!audio) return;
+
+        const progressBar = document.getElementById('audioProgressBar');
+        const currentTimeSpan = document.getElementById('audioCurrentTime');
+        const totalDurationSpan = document.getElementById('audioTotalDuration');
+        const playIcon = document.getElementById('audioPlayIcon');
+        const pauseIcon = document.getElementById('audioPauseIcon');
+
+        audio.addEventListener('timeupdate', () => {
+            if (audio.duration && !isNaN(audio.duration)) {
+                const percent = (audio.currentTime / audio.duration) * 100;
+                if (progressBar) progressBar.value = percent;
+                if (currentTimeSpan) currentTimeSpan.textContent = this.formatSeconds(audio.currentTime);
+            }
+        });
+
+        audio.addEventListener('loadedmetadata', () => {
+            if (totalDurationSpan && audio.duration && !isNaN(audio.duration)) {
+                totalDurationSpan.textContent = this.formatSeconds(audio.duration);
+            }
+        });
+
+        audio.addEventListener('play', () => {
+            if (playIcon) playIcon.style.display = 'none';
+            if (pauseIcon) pauseIcon.style.display = 'block';
+        });
+
+        audio.addEventListener('pause', () => {
+            if (playIcon) playIcon.style.display = 'block';
+            if (pauseIcon) pauseIcon.style.display = 'none';
+        });
+
+        audio.addEventListener('ended', () => {
+            if (playIcon) playIcon.style.display = 'block';
+            if (pauseIcon) pauseIcon.style.display = 'none';
+            if (progressBar) progressBar.value = 0;
+            if (currentTimeSpan) currentTimeSpan.textContent = '0:00';
+        });
+
+        audio.addEventListener('error', (e) => {
+            console.warn('Audio stream playback notice:', e);
+            this.showToast('Attendi il caricamento dello stream audio o passa al player video.', 'info');
+        });
+    },
+
+    formatSeconds(sec) {
+        if (!sec || isNaN(sec)) return '0:00';
+        const total = Math.floor(sec);
+        const m = Math.floor(total / 60);
+        const s = total % 60;
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
     },
 
     // TOAST NOTIFICATIONS
@@ -326,61 +388,133 @@ const app = {
         });
     },
 
-    // RESET PREVIEW PLAYER
+    // SMART MULTI-MODE PREVIEW PLAYER (ANTI-VPN / ZERO RESTRIZIONI)
     resetPreviewPlayer() {
         const container = document.getElementById('previewEmbedContainer');
-        const iframe = document.getElementById('previewIframe');
-        const btn = document.getElementById('togglePlayerBtn');
+        const audio = document.getElementById('nativeAudioElement');
+        const iframeYt = document.getElementById('previewIframe');
+        const iframeProxy = document.getElementById('proxyVideoIframe');
+        const btnText = document.getElementById('togglePlayerBtnText');
+        const progressBar = document.getElementById('audioProgressBar');
+        const currentTimeSpan = document.getElementById('audioCurrentTime');
 
-        if (container) {
-            container.style.display = 'none';
+        if (audio) {
+            audio.pause();
+            audio.src = '';
         }
-        if (iframe) {
-            iframe.src = '';
-            iframe.dataset.embedUrl = '';
-        }
-        if (btn) {
-            btn.innerHTML = `
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                </svg>
-                <span>Ascolta Anteprima</span>
-            `;
-        }
+        if (iframeYt) iframeYt.src = '';
+        if (iframeProxy) iframeProxy.src = '';
+
+        if (progressBar) progressBar.value = 0;
+        if (currentTimeSpan) currentTimeSpan.textContent = '0:00';
+
+        if (container) container.style.display = 'none';
+        if (btnText) btnText.textContent = 'Ascolta Anteprima';
+
+        this.currentAudioUrl = null;
+        this.currentEmbedUrl = null;
+        this.currentProxyUrl = null;
     },
 
-    // TOGGLE PREVIEW PLAYER
     togglePreviewPlayer() {
         const container = document.getElementById('previewEmbedContainer');
-        const iframe = document.getElementById('previewIframe');
-        const btn = document.getElementById('togglePlayerBtn');
-
-        if (!container || !iframe || !btn) return;
+        const btnText = document.getElementById('togglePlayerBtnText');
+        if (!container) return;
 
         const isHidden = container.style.display === 'none' || !container.style.display;
 
         if (isHidden) {
             container.style.display = 'block';
-            if (iframe.dataset.embedUrl) {
-                iframe.src = iframe.dataset.embedUrl;
-            }
-            btn.innerHTML = `
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <rect x="6" y="4" width="4" height="16"/>
-                    <rect x="14" y="4" width="4" height="16"/>
-                </svg>
-                <span>Chiudi Player</span>
-            `;
+            if (btnText) btnText.textContent = 'Chiudi Anteprima';
+            this.switchPlayerTab(this.activePlayerTab || 'audio');
         } else {
-            container.style.display = 'none';
-            iframe.src = '';
-            btn.innerHTML = `
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                </svg>
-                <span>Ascolta Anteprima</span>
-            `;
+            this.resetPreviewPlayer();
         }
+    },
+
+    switchPlayerTab(tabName) {
+        this.activePlayerTab = tabName;
+
+        const tabs = ['tabAudioDirect', 'tabVideoYt', 'tabVideoProxy'];
+        tabs.forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.classList.remove('active');
+        });
+
+        const panes = ['playerViewAudio', 'playerViewYt', 'playerViewProxy'];
+        panes.forEach(id => {
+            const p = document.getElementById(id);
+            if (p) p.style.display = 'none';
+        });
+
+        const audio = document.getElementById('nativeAudioElement');
+        const iframeYt = document.getElementById('previewIframe');
+        const iframeProxy = document.getElementById('proxyVideoIframe');
+
+        if (tabName === 'audio') {
+            const btn = document.getElementById('tabAudioDirect');
+            const pane = document.getElementById('playerViewAudio');
+            if (btn) btn.classList.add('active');
+            if (pane) pane.style.display = 'block';
+
+            // Ferma video se attivi
+            if (iframeYt) iframeYt.src = '';
+            if (iframeProxy) iframeProxy.src = '';
+
+            // Avvia audio stream se non impostato
+            if (audio && this.currentAudioUrl && audio.src !== window.location.origin + this.currentAudioUrl && !audio.src.endsWith(this.currentAudioUrl)) {
+                audio.src = this.currentAudioUrl;
+                audio.play().catch(e => console.log('Autoplay audio deferred:', e));
+            }
+        } else if (tabName === 'video-yt') {
+            const btn = document.getElementById('tabVideoYt');
+            const pane = document.getElementById('playerViewYt');
+            if (btn) btn.classList.add('active');
+            if (pane) pane.style.display = 'block';
+
+            if (audio) audio.pause();
+            if (iframeProxy) iframeProxy.src = '';
+
+            if (iframeYt && this.currentEmbedUrl && iframeYt.src !== this.currentEmbedUrl) {
+                iframeYt.src = this.currentEmbedUrl;
+            }
+        } else if (tabName === 'video-proxy') {
+            const btn = document.getElementById('tabVideoProxy');
+            const pane = document.getElementById('playerViewProxy');
+            if (btn) btn.classList.add('active');
+            if (pane) pane.style.display = 'block';
+
+            if (audio) audio.pause();
+            if (iframeYt) iframeYt.src = '';
+
+            if (iframeProxy && this.currentProxyUrl && iframeProxy.src !== this.currentProxyUrl) {
+                iframeProxy.src = this.currentProxyUrl;
+            }
+        }
+    },
+
+    toggleNativeAudio() {
+        const audio = document.getElementById('nativeAudioElement');
+        if (!audio) return;
+
+        if (!audio.src && this.currentAudioUrl) {
+            audio.src = this.currentAudioUrl;
+        }
+
+        if (audio.paused) {
+            audio.play().catch(e => {
+                console.warn('Playback error:', e);
+                this.showToast('Avvio streaming in corso...', 'info');
+            });
+        } else {
+            audio.pause();
+        }
+    },
+
+    seekNativeAudio(percentVal) {
+        const audio = document.getElementById('nativeAudioElement');
+        if (!audio || !audio.duration) return;
+        audio.currentTime = (parseFloat(percentVal) / 100) * audio.duration;
     },
 
     // OPEN SONG DETAILS VIEW
@@ -412,6 +546,14 @@ const app = {
 
             const data = json.data;
             this.currentTrack = data;
+
+            // Salva URL player multi-mode
+            this.currentAudioUrl = data.direct_audio_url || `/api/preview/audio/${data.id}`;
+            this.currentEmbedUrl = data.embed_url || `https://www.youtube.com/embed/${data.id}?autoplay=1&enablejsapi=1&rel=0`;
+            this.currentProxyUrl = data.proxy_video_url || `https://yewtu.be/embed/${data.id}`;
+
+            const totalDurationSpan = document.getElementById('audioTotalDuration');
+            if (totalDurationSpan) totalDurationSpan.textContent = data.duration || '0:00';
 
             // Popola i dettagli della scheda
             card.style.display = 'block';
@@ -467,10 +609,7 @@ const app = {
                 dateWrapper.style.display = 'none';
             }
 
-            // Assegna il link embed pulito al player
-            document.getElementById('previewIframe').dataset.embedUrl = data.embed_url;
-
-            // Se c'è già un task attivo per questa canzone, aggancialo alla barra di avanzamento
+            // Se c'è già un task attivo o in coda per questa canzone, aggancialo alla barra di avanzamento
             this.syncDetailsTaskWithActive();
 
         } catch (err) {
@@ -480,7 +619,7 @@ const app = {
         }
     },
 
-    // START DOWNLOAD (MP3 OR MP4)
+    // START DOWNLOAD (MP3 OR MP4) CON CODA SEQUENZIALE
     async startDownload(format) {
         if (!this.currentTrack) return;
 
@@ -490,12 +629,15 @@ const app = {
         const progressBar = document.getElementById('progressBarFill');
         const percentText = document.getElementById('progressPercentText');
         const statusText = document.getElementById('progressStatusText');
+        const queueBadge = document.getElementById('progressQueueBadge');
         const successActions = document.getElementById('progressSuccessActions');
 
         mp3Btn.disabled = true;
         mp4Btn.disabled = true;
         progressBox.style.display = 'block';
         successActions.style.display = 'none';
+        if (queueBadge) queueBadge.style.display = 'none';
+
         progressBar.style.width = '5%';
         percentText.textContent = '5%';
         statusText.textContent = format === 'mp3' ? 'Avvio estrazione audio MP3 a 320 kbps...' : 'Avvio download video MP4 in massima qualità...';
@@ -523,7 +665,12 @@ const app = {
             if (data.success && data.task_id) {
                 this.currentDetailTaskId = data.task_id;
                 this.addMyInitiatedTask(data.task_id); // Registra che QUESTO dispositivo ha avviato il download
-                this.showToast(`Download avviato! Controllalo in "I Miei Download"`, 'info');
+
+                if (data.status === 'queued') {
+                    this.showToast(`⏳ Messo in coda (posizione #${data.queue_position})! Inizierà in sequenza.`, 'info');
+                } else {
+                    this.showToast(`Download avviato! Controllalo in "I Miei Download"`, 'info');
+                }
                 this.pollActiveTasks();
             } else {
                 throw new Error('Errore durante l\'avvio dell\'elaborazione');
@@ -536,7 +683,7 @@ const app = {
         }
     },
 
-    // GLOBAL TASKS POLLER (IN BACKGROUND PER SINCRONIZZARE I MIEI DOWNLOAD E I BADGE)
+    // GLOBAL TASKS POLLER (IN BACKGROUND PER GESTIRE CODA, DISPOSITIVO E NOTIFICHE)
     startTasksPoller() {
         if (this.tasksPollerTimer) clearInterval(this.tasksPollerTimer);
         this.pollActiveTasks();
@@ -556,18 +703,37 @@ const app = {
             this.activeTasks.clear();
             tasks.forEach(t => this.activeTasks.set(t.task_id, t));
 
-            // Filtro task attivi/in corso per questo client
-            const activeOnly = tasks.filter(t => ['starting', 'downloading', 'converting', 'tagging', 'pending', 'paused'].includes(t.status));
+            // Filtro task attivi o in coda per questo client
+            const activeOnly = tasks.filter(t => ['starting', 'downloading', 'converting', 'tagging', 'pending', 'paused', 'queued'].includes(t.status));
+            const queuedCount = activeOnly.filter(t => t.status === 'queued').length;
+            const inProgressCount = activeOnly.length - queuedCount;
 
-            // Aggiorna indicatore dinamico "in corso" nella Navbar accanto a "I Miei Download"
-            const liveIndicator = document.getElementById('navLiveIndicator');
-            const liveText = document.getElementById('navLiveText');
-            if (liveIndicator && liveText) {
+            // 1. Badge mobile compatto galleggiante sull'icona (Nessuna sovrapposizione su smartphone!)
+            const liveBadge = document.getElementById('navLiveBadge');
+            if (liveBadge) {
                 if (activeOnly.length > 0) {
-                    liveIndicator.style.display = 'inline-flex';
-                    liveText.textContent = `${activeOnly.length} in corso`;
+                    liveBadge.style.display = 'flex';
+                    liveBadge.textContent = activeOnly.length;
                 } else {
-                    liveIndicator.style.display = 'none';
+                    liveBadge.style.display = 'none';
+                }
+            }
+
+            // 2. Indicatore esteso Desktop
+            const liveIndicatorDesktop = document.getElementById('navLiveIndicatorDesktop');
+            const liveTextDesktop = document.getElementById('navLiveTextDesktop');
+            if (liveIndicatorDesktop && liveTextDesktop) {
+                if (activeOnly.length > 0) {
+                    liveIndicatorDesktop.style.display = 'inline-flex';
+                    if (queuedCount > 0 && inProgressCount > 0) {
+                        liveTextDesktop.textContent = `${inProgressCount} in corso (${queuedCount} in coda)`;
+                    } else if (queuedCount > 0) {
+                        liveTextDesktop.textContent = `${queuedCount} in coda`;
+                    } else {
+                        liveTextDesktop.textContent = `${inProgressCount} in corso`;
+                    }
+                } else {
+                    liveIndicatorDesktop.style.display = 'none';
                 }
             }
 
@@ -582,11 +748,6 @@ const app = {
             }
 
             // Notifica e trigger download:
-            // ATTENZIONE: IL BROWSER DEVE SCARICARE AUTOMATICAMENTE IL FILE SOLO SE:
-            // 1. Lo stato del task è 'finished'
-            // 2. QUESTO specifico dispositivo ha avviato il download (myInitiated.has)
-            // 3. Non è già stato scaricato in precedenza su questo dispositivo (!downloaded.has)
-            // 4. Il server non ha già eliminato il file (!t.server_cleaned)
             const myInitiated = this.getMyInitiatedTasks();
             const downloaded = this.getDownloadedTasks();
 
@@ -621,7 +782,7 @@ const app = {
         }
     },
 
-    // RENDER DOWNLOAD IN CORSO ALL'INTERNO DELLA SEZIONE "I MIEI DOWNLOAD"
+    // RENDER DOWNLOAD E CODA SEQUENZIALE IN "I MIEI DOWNLOAD"
     renderActiveTasksSection() {
         const wrapper = document.getElementById('activeDownloadsWrapper');
         const countSpan = document.getElementById('activeDownloadsCount');
@@ -629,8 +790,8 @@ const app = {
         if (!wrapper || !container) return;
 
         const tasks = Array.from(this.activeTasks.values());
-        // Mostra task attivi, in pausa o appena completati
-        const relevantTasks = tasks.filter(t => ['starting', 'downloading', 'converting', 'tagging', 'pending', 'paused'].includes(t.status));
+        // Mostra task attivi, in coda o in pausa
+        const relevantTasks = tasks.filter(t => ['starting', 'downloading', 'converting', 'tagging', 'pending', 'paused', 'queued'].includes(t.status));
 
         if (!relevantTasks.length) {
             wrapper.style.display = 'none';
@@ -647,13 +808,21 @@ const app = {
             card.className = 'active-task-card';
 
             const isMp3 = task.format === 'mp3';
-            const fmtClass = isMp3 ? 'fmt-mp3' : 'fmt-mp4';
-            const fmtLabel = isMp3 ? 'MP3 320K' : 'MP4 VIDEO';
+            let fmtClass = isMp3 ? 'fmt-mp3' : 'fmt-mp4';
+            let fmtLabel = isMp3 ? 'MP3 320K' : 'MP4 VIDEO';
             const progress = Math.round(task.progress || 0);
 
             let statusLabel = 'In preparazione...';
             let barModifier = '';
-            if (task.status === 'downloading') {
+            let barWidth = `${progress}%`;
+
+            if (task.status === 'queued') {
+                fmtClass = 'fmt-queued';
+                fmtLabel = `IN CODA (#${task.queue_position || 1})`;
+                statusLabel = `⏳ In coda (Posizione #${task.queue_position || 1}) - Inizierà al termine del file attuale`;
+                barModifier = 'bar-queued';
+                barWidth = '100%';
+            } else if (task.status === 'downloading') {
                 statusLabel = `Scaricamento stream (${progress}%)`;
             } else if (task.status === 'paused') {
                 statusLabel = `In Pausa (${progress}%)`;
@@ -664,11 +833,21 @@ const app = {
                 statusLabel = 'Applicazione tag ID3 e copertina...';
             }
 
-            const speedEta = (task.speed || task.eta) ? `<span>Velocità: ${task.speed || '--'} | Tempo: ${task.eta || '--'}</span>` : `<span>${statusLabel}</span>`;
+            const speedEta = task.status === 'queued'
+                ? `<span>In attesa del proprio turno in sequenza...</span>`
+                : (task.speed || task.eta)
+                    ? `<span>Velocità: ${task.speed || '--'} | Tempo: ${task.eta || '--'}</span>`
+                    : `<span>${statusLabel}</span>`;
 
             // Action buttons
             let actionButtonsHtml = '';
-            if (['downloading', 'starting', 'pending'].includes(task.status)) {
+            if (task.status === 'queued') {
+                actionButtonsHtml += `
+                    <button class="task-ctrl-btn cancel-ctrl" onclick="app.cancelTask('${task.task_id}')">
+                        ⏹️ Rimuovi dalla Coda
+                    </button>
+                `;
+            } else if (['downloading', 'starting', 'pending'].includes(task.status)) {
                 actionButtonsHtml += `
                     <button class="task-ctrl-btn pause-ctrl" onclick="app.pauseTask('${task.task_id}')">
                         ⏸️ Metti in Pausa
@@ -701,6 +880,8 @@ const app = {
                 `;
             }
 
+            const progressDisplay = task.status === 'queued' ? 'In coda' : `${progress}%`;
+
             card.innerHTML = `
                 <div class="active-task-header">
                     <img class="active-task-thumb" src="${task.thumbnail_url || '/static/icons/logo.png'}" onerror="this.src='/static/icons/logo.png'" />
@@ -715,11 +896,11 @@ const app = {
 
                 <div class="active-task-progress-box">
                     <div class="active-progress-track">
-                        <div class="active-progress-bar ${barModifier}" style="width: ${progress}%;"></div>
+                        <div class="active-progress-bar ${barModifier}" style="width: ${barWidth};"></div>
                     </div>
                     <div class="active-task-meta-row">
                         ${speedEta}
-                        <strong>${progress}%</strong>
+                        <strong>${progressDisplay}</strong>
                     </div>
                 </div>
 
@@ -732,7 +913,7 @@ const app = {
         });
     },
 
-    // SINCRONIZZAZIONE DELLA SCHEDA DETTAGLI CON I CONTROLLI DEL TASK
+    // SINCRONIZZAZIONE DELLA SCHEDA DETTAGLI CON I CONTROLLI DEL TASK E CODA
     syncDetailsTaskWithActive() {
         if (!this.currentTrack) return;
         const progressBox = document.getElementById('downloadProgressBox');
@@ -743,7 +924,7 @@ const app = {
             matchingTask = this.activeTasks.get(this.currentDetailTaskId);
         } else {
             for (const t of this.activeTasks.values()) {
-                if (t.url_or_id === this.currentTrack.id && ['downloading', 'starting', 'paused', 'converting', 'tagging'].includes(t.status)) {
+                if (t.url_or_id === this.currentTrack.id && ['downloading', 'starting', 'paused', 'converting', 'tagging', 'queued'].includes(t.status)) {
                     matchingTask = t;
                     this.currentDetailTaskId = t.task_id;
                     break;
@@ -757,6 +938,7 @@ const app = {
         const progressBar = document.getElementById('progressBarFill');
         const percentText = document.getElementById('progressPercentText');
         const statusText = document.getElementById('progressStatusText');
+        const queueBadge = document.getElementById('progressQueueBadge');
         const speedText = document.getElementById('progressSpeedText');
         const etaText = document.getElementById('progressEtaText');
         const successActions = document.getElementById('progressSuccessActions');
@@ -765,6 +947,31 @@ const app = {
         const pauseBtn = document.getElementById('detailPauseBtn');
         const resumeBtn = document.getElementById('detailResumeBtn');
         const cancelBtn = document.getElementById('detailCancelBtn');
+
+        progressBar.className = 'progress-bar-fill';
+
+        if (matchingTask.status === 'queued') {
+            if (queueBadge) {
+                queueBadge.style.display = 'inline-flex';
+                queueBadge.textContent = `⏳ In Coda (#${matchingTask.queue_position || 1})`;
+            }
+            statusText.textContent = `In coda: inizierà automaticamente al termine del download attuale.`;
+            progressBar.classList.add('bar-queued');
+            progressBar.style.width = '100%';
+            percentText.textContent = 'In coda';
+            speedText.textContent = `Posizione in coda: #${matchingTask.queue_position || 1}`;
+            etaText.textContent = `Inizierà in sequenza`;
+            pauseBtn.style.display = 'none';
+            resumeBtn.style.display = 'none';
+            cancelBtn.style.display = 'inline-flex';
+            cancelBtn.innerHTML = `⏹️ Rimuovi dalla Coda`;
+            mp3Btn.disabled = true;
+            mp4Btn.disabled = true;
+            return;
+        }
+
+        if (queueBadge) queueBadge.style.display = 'none';
+        cancelBtn.innerHTML = `⏹️ Annulla & Libera Memoria`;
 
         const p = Math.round(matchingTask.progress || 0);
         progressBar.style.width = `${p}%`;
@@ -778,6 +985,7 @@ const app = {
             pauseBtn.style.display = 'none';
             resumeBtn.style.display = 'inline-flex';
             cancelBtn.style.display = 'inline-flex';
+            progressBar.classList.add('bar-paused');
         } else if (matchingTask.status === 'downloading') {
             statusText.textContent = 'Scaricamento stream da sorgente...';
             pauseBtn.style.display = 'inline-flex';
@@ -907,27 +1115,28 @@ const app = {
         const emptyState = document.getElementById('filesEmpty');
         const completedSpan = document.getElementById('completedFilesCount');
 
+        if (!container) return;
         container.innerHTML = '';
-        loading.style.display = 'block';
-        emptyState.style.display = 'none';
+        if (loading) loading.style.display = 'block';
+        if (emptyState) emptyState.style.display = 'none';
 
         try {
             const res = await fetch('/api/files');
             const data = await res.json();
 
-            loading.style.display = 'none';
+            if (loading) loading.style.display = 'none';
 
             if (data.success && data.files && data.files.length > 0) {
                 this.renderFilesList(container, data.files);
                 this.updateBadge(data.files.length);
                 if (completedSpan) completedSpan.textContent = data.files.length;
             } else {
-                emptyState.style.display = 'block';
+                if (emptyState) emptyState.style.display = 'block';
                 this.updateBadge(0);
                 if (completedSpan) completedSpan.textContent = '0';
             }
         } catch (err) {
-            loading.style.display = 'none';
+            if (loading) loading.style.display = 'none';
             this.showToast('Errore recupero file scaricati', 'error');
         }
     },

@@ -498,7 +498,9 @@ def get_track_details(video_id: str) -> Optional[Dict[str, Any]]:
                 "description": info.get('description', '')[:350] + ("..." if len(info.get('description', '')) > 350 else ""),
                 "max_video_quality": quality_label,
                 "max_audio_quality": "320 kbps (Massima Qualità MP3)",
-                "embed_url": f"https://www.youtube-nocookie.com/embed/{video_id}?autoplay=0",
+                "embed_url": f"https://www.youtube.com/embed/{video_id}?autoplay=1&enablejsapi=1&rel=0",
+                "proxy_video_url": f"https://yewtu.be/embed/{video_id}",
+                "direct_audio_url": f"/api/preview/audio/{video_id}",
                 "is_art_track": is_art,
                 "has_official_video": has_official_video,
                 "official_video_id": official_video_id,
@@ -507,3 +509,37 @@ def get_track_details(video_id: str) -> Optional[Dict[str, Any]]:
     except Exception as e:
         print(f"[get_track_details Error for {video_id}] {e}")
         return None
+
+
+# In-memory stream cache for instant preview & fast Range seeking (TTL 45 minutes)
+_STREAM_CACHE: Dict[str, tuple[float, str, str]] = {}
+
+def get_audio_stream_url(video_id: str) -> Optional[tuple[str, str]]:
+    """
+    Retrieve direct audio stream URL and mime type for in-browser preview.
+    Completely immune to YouTube iframe embed restrictions and VPN blocks.
+    """
+    now = time.time()
+    cached = _STREAM_CACHE.get(video_id)
+    if cached and (now - cached[0] < 2700):
+        return cached[1], cached[2]
+
+    ydl_opts = {
+        'format': 'bestaudio[ext=m4a]/bestaudio/best',
+        'quiet': True,
+        'skip_download': True,
+        'noplaylist': True
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            url = f"https://www.youtube.com/watch?v={video_id}"
+            info = ydl.extract_info(url, download=False)
+            stream_url = info.get('url') if info else None
+            ext = info.get('ext', 'mp4') if info else 'mp4'
+            mime = "audio/mp4" if ext in ("m4a", "mp4") else "audio/webm"
+            if stream_url:
+                _STREAM_CACHE[video_id] = (now, stream_url, mime)
+                return stream_url, mime
+    except Exception as e:
+        print(f"[get_audio_stream_url Error for {video_id}] {e}")
+    return None

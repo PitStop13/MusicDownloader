@@ -1,6 +1,7 @@
 import os
+import requests
 from fastapi import FastAPI, HTTPException, Query, BackgroundTasks, Request
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
@@ -10,7 +11,8 @@ from app.music_service import (
     get_popular_tracks,
     search_tracks,
     get_track_details,
-    resolve_spotify_url
+    resolve_spotify_url,
+    get_audio_stream_url
 )
 from app.downloader import (
     start_download_task,
@@ -100,9 +102,64 @@ async def api_details(video_id: str):
     }
 
 
+@app.get("/api/preview/audio/{video_id}")
+async def api_preview_audio(video_id: str, request: Request):
+    """
+    Direct proxy audio stream for native in-browser preview.
+    Supports HTTP Range requests (seeking) and completely bypasses
+    YouTube iframe blocks, VPN restrictions, and 'Watch on YouTube' errors.
+    """
+    res = get_audio_stream_url(video_id)
+    if not res:
+        raise HTTPException(status_code=404, detail="Audio preview non disponibile per questo brano.")
+
+    stream_url, mime_type = res
+    range_header = request.headers.get("Range")
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    if range_header:
+        headers["Range"] = range_header
+
+    try:
+        upstream_resp = requests.get(stream_url, headers=headers, stream=True, timeout=12)
+        
+        response_headers = {
+            "Content-Type": mime_type,
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "public, max-age=3600"
+        }
+        if "Content-Range" in upstream_resp.headers:
+            response_headers["Content-Range"] = upstream_resp.headers["Content-Range"]
+        if "Content-Length" in upstream_resp.headers:
+            response_headers["Content-Length"] = upstream_resp.headers["Content-Length"]
+
+        def stream_content():
+            try:
+                for chunk in upstream_resp.iter_content(chunk_size=64 * 1024):
+                    if chunk:
+                        yield chunk
+            except Exception:
+                pass
+            finally:
+                upstream_resp.close()
+
+        status_code = upstream_resp.status_code if upstream_resp.status_code in (200, 206) else 200
+
+        return StreamingResponse(
+            stream_content(),
+            status_code=status_code,
+            headers=response_headers,
+            media_type=mime_type
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Errore nello streaming audio: {e}")
+
+
 @app.post("/api/download")
 async def api_download(req: DownloadRequest):
-    """Initiate an MP3 or MP4 download task."""
+    """Initiate an MP3 or MP4 download task with sequential queue management."""
     fmt = req.format.lower()
     if fmt not in ["mp3", "mp4"]:
         fmt = "mp3"
@@ -117,17 +174,22 @@ async def api_download(req: DownloadRequest):
         client_id=req.client_id
     )
 
+    task = get_task(task_id)
+    status = task.get("status", "pending") if task else "pending"
+    queue_pos = task.get("queue_position", 0) if task else 0
+
     return {
         "success": True,
         "task_id": task_id,
-        "status": "pending",
+        "status": status,
+        "queue_position": queue_pos,
         "format": fmt
     }
 
 
 @app.get("/api/tasks")
 async def api_get_all_tasks(client_id: Optional[str] = Query(None)):
-    """Retrieve all active and recent download tasks, optionally filtered by client_id."""
+    """Retrieve all active, queued, and recent download tasks, optionally filtered by client_id."""
     tasks = get_all_tasks(client_id=client_id)
     return {
         "success": True,
@@ -138,7 +200,7 @@ async def api_get_all_tasks(client_id: Optional[str] = Query(None)):
 
 @app.get("/api/task/{task_id}")
 async def api_task_status(task_id: str):
-    """Poll the status of an ongoing download task."""
+    """Poll the status of an ongoing or queued download task."""
     task = get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Attività di download non trovata.")
@@ -150,7 +212,7 @@ async def api_task_status(task_id: str):
 
 @app.post("/api/task/{task_id}/pause")
 async def api_task_pause(task_id: str):
-    """Pause an active download task."""
+    """Pause an active or queued download task."""
     success = pause_download_task(task_id)
     if not success:
         raise HTTPException(status_code=400, detail="Impossibile mettere in pausa l'attività (non attiva o già terminata).")
@@ -174,7 +236,7 @@ async def api_task_resume(task_id: str):
 
 @app.post("/api/task/{task_id}/cancel")
 async def api_task_cancel(task_id: str):
-    """Cancel an active or paused download task and clean up partial files."""
+    """Cancel an active or queued download task and clean up partial files."""
     success = cancel_download_task(task_id)
     if not success:
         raise HTTPException(status_code=404, detail="Attività non trovata.")
@@ -186,7 +248,7 @@ async def api_task_cancel(task_id: str):
 
 @app.delete("/api/task/{task_id}")
 async def api_task_delete(task_id: str):
-    """Remove task from active tracker list."""
+    """Remove task from active tracker list and queue."""
     success = delete_task(task_id)
     if not success:
         raise HTTPException(status_code=404, detail="Attività non trovata.")

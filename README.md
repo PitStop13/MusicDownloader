@@ -1,267 +1,277 @@
-# 🎵 MusicDownloader - Docker App (100% Open Source)
-
-<p align="center">
-  <img src="assets/banner.svg" alt="MusicDownloader Banner" width="100%" />
-</p>
-
-<p align="center">
-  <strong>Applicazione Docker moderna, veloce e completamente Open Source per cercare, ascoltare in anteprima e scaricare musica e video da YouTube, YouTube Music e Spotify in massima qualità (MP3 320 kbps / Video MP4 HD & 4K).</strong>
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" />
-  <img src="https://img.shields.io/badge/CasaOS-Compatible-00D1B2?style=for-the-badge&logo=linux&logoColor=white" />
-  <img src="https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white" />
-  <img src="https://img.shields.io/badge/FFmpeg-Included-007808?style=for-the-badge&logo=ffmpeg&logoColor=white" />
-  <img src="https://img.shields.io/badge/yt--dlp-Latest-FF0000?style=for-the-badge&logo=youtube&logoColor=white" />
-  <img src="https://img.shields.io/badge/Open%20Source-100%25-success?style=for-the-badge" />
-</p>
-
----
-
-## 📸 Anteprima Interfaccia
-
-<p align="center">
-  <img src="assets/app-preview.svg" alt="MusicDownloader App Preview" width="100%" />
-</p>
-
----
-
-## 🌟 Caratteristiche Principali
-
-- 🌐 **100% Open Source & Zero Dipendenze Esterne**: Non richiede account premium, chiavi API o login su servizi esterni. Tutto gira nel tuo container locale.
-- ⚡ **Ricerca Incrementale (Live Search)**:
-  - Inizia a cercare in tempo reale ad ogni tasto non appena scrivi **almeno 3 caratteri**.
-  - Debounce fluido di 320ms con annullamento intelligente delle chiamate superate (`AbortController`).
-  - Se cancelli il testo con la tastiera o premi la `✕`, l'app **torna automaticamente e fluidamente alla home dei brani popolari**.
-- 🔗 **Supporto Link Diretti**:
-  - Incolla direttamente link di **YouTube** (`https://youtube.com/watch?v=...`, `youtu.be`, YouTube Music).
-  - Incolla direttamente link di **Spotify** (`https://open.spotify.com/track/...`): i metadati del brano vengono risolti automaticamente in locale via oEmbed senza bisogno di token Spotify e associati alla corrispondenza migliore.
-- 🔥 **Classifiche e Canzoni Popolari in Tempo Reale**:
-  - Selettore istantaneo per nazione: 🇮🇹 **Italia**, 🌍 **Globale**, 🇺🇸 **USA**, 🇬🇧 **UK**, 🇪🇸 **Spagna**.
-  - Card moderne con copertina HD, titolo, artista, durata e badge di posizione (#1, #2, ...).
-- 📄 **Pagina Dettagli Canzone Completa**:
-  - Copertina ad altissima risoluzione con bagliore atmosferico.
-  - Artista verificato, durata, visualizzazioni, data di uscita e album.
-  - **Player di Anteprima integrato**: ascolta o guarda il brano prima di scaricarlo con sincronizzazione perfetta dello stato (pronto al primo clic).
-- 🎵 **Download Audio MP3 (Massima Qualità 320 kbps)**:
-  - Estrazione del flusso audio migliore disponibile.
-  - Conversione ad alta fedeltà a **320 kbps con FFmpeg**.
-  - **Copertina HD incorporata** direttamente nel file MP3 (tag ID3v2 APIC).
-  - **Tag ID3 completi** (Titolo, Artista, Album) per una visualizzazione perfetta su autoradio, iPhone, Android e lettori MP3.
-- 🎬 **Download Video MP4 con Rilevamento Intelligente del Videoclip Ufficiale**:
-  - Risolve il problema dei brani YouTube Music / Topic / Spotify: anziché scaricare un'immagine statica con audio, il motore **individua automaticamente il vero videoclip musicale ufficiale in HD / 4K**!
-  - Fusione con FFmpeg del flusso video a massima risoluzione (1080p, 1440p, 4K) e della traccia audio ad alta fedeltà.
-  - File MP4 universale compatibile con PC, Smart TV e smartphone.
-- 📥 **Pannello Globale Persistente dei Download (Drawer fluttuante)**:
-  - Tutti i download rimangono sempre visibili e monitorabili in tempo reale tramite un pratico cassetto fluttuante e un badge animato nella barra di navigazione.
-  - Puoi navigare tra le pagine, cercare altre canzoni o esplorare le classifiche: **i download continuano fluidamente in background senza interrompersi mai**.
-- ⏯️ **Controllo Totale del Download (Pausa, Ripresa, Annullamento & Pulizia)**:
-  - **Pausa**: sospendi qualsiasi download in corso salvaguardando i byte scaricati fino a quel momento.
-  - **Ripresa dal punto esatto**: riparti istantaneamente dal punto e byte in cui era stato interrotto senza riscaricare tutto da capo.
-  - **Annulla & Libera Memoria**: interrompe il processo e rimuove automaticamente i file temporanei `.part`, liberando subito memoria RAM e spazio disco.
-- 💻 **100% Salvataggio Diretto sul Client (Zero Memoria sul Server)**:
-  - I file scaricati (MP3 e MP4) vengono inviati **esclusivamente e direttamente al dispositivo** (PC, smartphone o tablet) che apre l'applicazione web.
-  - Il server converte i flussi al volo ed **elimina immediatamente qualsiasi file temporaneo** non appena il trasferimento verso il browser del client è completato.
-  - Nessun file musicale o video si accumula sul server o nel container Docker: massima privacy, zero spazio disco consumato su CasaOS o NAS!
-- 📥 **Gestore Unificato "I Miei Download" & Badge di Notifica**:
-  - Un'unica sezione intuitiva che mostra l'avanzamento dei download attivi, velocità (MB/s), tempo rimanente e stato di completamento.
-  - Download trigger automatico nel browser al 100% con notifica a comparsa.
-  - Badge dinamico nella barra di navigazione con conteggio live delle conversioni in corso.
-- 📱 **Ottimizzazione Mobile & UI Responsive (Touch-friendly)**:
-  - Layout moderno a **2 colonne** per smartphone con copertine 1:1, ispirato alla user-experience di Spotify e YouTube Music.
-  - Prevenzione automatica del fastidioso zoom su iOS Safari (`font-size: 16px` sul campo di ricerca).
-  - Chip dei suggerimenti e bandiere delle nazioni con scorrimento orizzontale tattile (`swipe`).
-  - Pulsanti con ampie aree di tocco touch (min. 44px) e supporto a notch e Safe Area (`viewport-fit=cover`).
-- 🔒 **Isolamento Multidispositivo Intelligente (Zero Re-Download Fantasma)**:
-  - Ogni client (PC, smartphone o tablet) riceve un identificatore univoco e gestisce **esclusivamente i download avviati da quel browser**.
-  - Aprendo il link dell'app da smartphone dopo aver scaricato musica dal computer, il telefono **non proverà mai a riscaricare brani o video scaricati in precedenza dal PC**.
-
----
-
-## 📥 Guida al Download: Come Funziona Passo-Passo
-
-```mermaid
-flowchart TD
-    A[🔍 Scrivi 3 caratteri o incolla link YouTube/Spotify] --> B[⚡ Ricerca Incrementale Automatica]
-    B --> C[🎵 Seleziona il brano dall'elenco]
-    C --> D[📄 Pagina Dettagli + 🎧 Anteprima Ascolto]
-    D --> E{Cosa vuoi scaricare?}
-    E -->|🎵 Canzone Audio| F[Conversione al volo MP3 a 320kbps con FFmpeg + Tag ID3 e Cover]
-    E -->|🎬 Filmato Video| G[Fusione al volo Video HD/4K + Audio Hi-Fi in formato MP4]
-    F --> H[💻 Streaming Diretto nel Browser del Client]
-    G --> H
-    H --> I[💾 Salvataggio Automatico nei Download del tuo Dispositivo]
-    I --> J[🧹 Cancellazione Istantanea dal Server: 0 Byte rimasti!]
-```
-
----
-
-## 🏠 Installazione e Avvio
-
-### 1. Installazione su CasaOS (Home Server / NAS) 🏠
-
-#### Metodo 1: Dall'interfaccia web di CasaOS (Consigliato - 1 Click)
-
-1. Nella dashboard di CasaOS, clicca sul pulsante **"+"** (in alto a destra nella sezione App) e seleziona **"Installa un'applicazione personalizzata"** (*Install a customized app*).
-2. In alto a destra della finestra, clicca sull'icona **"Importa"** (`</>` o icona file).
-3. Incolla il seguente codice Docker Compose completo:
-
-```yaml
-name: musicdownloader
-services:
-  musicdownloader:
-    image: ghcr.io/pitstop13/musicdownloader:latest
-    container_name: musicdownloader-app
-    ports:
-      - "8765:8765"
-    environment:
-      - PYTHONUNBUFFERED=1
-      - PORT=8765
-    restart: unless-stopped
-    x-casaos:
-      ports:
-        - container: "8765"
-          description:
-            en_us: Web UI port for MusicDownloader
-            it_it: Porta interfaccia Web MusicDownloader
-x-casaos:
-  architectures:
-    - amd64
-    - arm64
-    - arm
-  main: musicdownloader
-  description:
-    en_us: Modern web interface to search, preview, and download music (320kbps MP3 with embedded ID3 tags & cover art) and videos (HD/4K MP4) directly to the client browser. Zero server disk usage!
-    it_it: Interfaccia web moderna per cercare, ascoltare e scaricare musica (MP3 a 320 kbps con tag ID3 e copertina) e video (MP4 HD/4K) direttamente sul browser del tuo dispositivo. Zero spazio occupato sul server/NAS!
-  tagline:
-    en_us: Direct Client Music & Video Downloader
-    it_it: Downloader Diretto Musica & Video sul Client
-  developer: MusicDownloader
-  author: PitStop13
-  icon: https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
-  thumbnail: https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
-  title:
-    en_us: MusicDownloader
-    it_it: MusicDownloader
-  index: /
-  port_map: "8765"
-```
-
-4. Clicca su **"Invia"** (*Submit*). I parametri principali, l'icona ufficiale, il titolo e la porta risulteranno **già tutti precompilati automaticamente**.
-5. Clicca su **"Installa"** e attendi il download dell'immagine pubblicata da GitHub Container Registry.
-6. Apri MusicDownloader cliccando sulla sua icona o collegandoti a: 👉 **`http://<IP-DEL-TUO-SERVER>:8765`**
-
-#### Metodo 2: Da Terminale o SSH (Server / NAS)
-```bash
-cd /DATA/AppData
-git clone https://github.com/PitStop13/MusicDownloader.git
-cd MusicDownloader
-docker compose up -d
-```
-
----
-
-### 2. Con 1 Click su Windows
-Fai doppio clic sul file:
-```cmd
-start.bat
-```
-Lo script si occuperà di:
-1. Verificare che Docker Desktop sia attivo (e avviarlo automaticamente se necessario);
-2. Costruire e avviare il container in background;
-3. Aprire il browser all'indirizzo **`http://localhost:8765`**.
-
----
-
-### 3. Tramite Docker Compose (Windows / Mac / Linux)
-Nel terminale della cartella del progetto:
-
-```bash
-docker compose up --build -d
-```
-
-Apri il browser su:
-👉 **http://localhost:8765**
-
-Per fermare il container:
-```bash
-docker compose down
-```
-
----
-
-### 4. Esecuzione Locale Senza Docker (Python)
-Se preferisci eseguire l'app direttamente in Python sul tuo computer:
-
-```bash
-# 1. Installa i requisiti
-pip install -r requirements.txt
-
-# 2. Avvia l'applicazione
-python run_local.py
-```
-*(Nota: per la conversione MP3 locale è consigliato avere `ffmpeg` installato nel PATH del sistema).*
-
----
-
-## 🧪 Test Automatizzati
-
-Il progetto include una suite di test end-to-end che valida l'intero flusso dell'applicazione:
-
-```bash
-python tests/test_suite.py
-```
-
-La suite verifica automaticamente:
-1. ✅ Health check del backend (`/api/health`)
-2. ✅ Caricamento della Single Page App (`GET /`)
-3. ✅ Classifiche live Italia e Global (`/api/popular`)
-4. ✅ Ricerca incrementale con debounce (`/api/search`)
-5. ✅ Risoluzione automatica dei link Spotify oEmbed
-6. ✅ Estrazione dettagli e qualità video 4K / audio 320kbps
-7. ✅ Download MP3 a 320 kbps su client con verifica copertina ID3 e rimozione immediata dal server
-8. ✅ Download Video MP4 (4K/HD) su client con multiplexing FFmpeg e rimozione immediata dal server
-
----
-
-## 🏗️ Architettura del Progetto
-
-```
-MusicDownloader/
-├── .github/
-│   └── workflows/
-│       └── docker-publish.yml # Build & pubblicazione automatica su GHCR (multi-arch amd64/arm64)
-├── app/
-│   ├── main.py                # Server FastAPI, endpoint REST e download stream
-│   ├── downloader.py          # Pipeline yt-dlp, conversione FFmpeg a 320kbps e ID3 tagging
-│   ├── music_service.py       # Classifiche YouTube Music live e risoluzione Spotify oEmbed
-│   ├── templates/
-│   │   └── index.html         # Single Page Application HTML5
-│   └── static/
-│       ├── css/
-│       │   └── style.css      # Tema scuro moderno Glassmorphism
-│       ├── js/
-│       │   └── app.js         # Logica client, ricerca incrementale, player e progress bar
-│       └── icons/
-│           ├── logo.png       # Icona ufficiale alta risoluzione
-│           └── logo.jpg
-├── assets/                    # Logo PNG, banner SVG e anteprime grafiche per CasaOS
-├── downloads/                 # Cartella volume montata sul tuo PC con i file scaricati
-├── tests/
-│   └── test_suite.py          # Suite di test automatizzati end-to-end (11 test)
-├── Dockerfile                 # Immagine Debian con Python 3.11, FFmpeg e Node.js
-├── docker-compose.yml         # Configurazione Docker Compose con schema x-casaos
-├── docker-compose.template.yml# Template CasaOS per installazione rapida con 1-click
-├── requirements.txt           # Dipendenze Python
-├── start.bat                  # Avvio con 1-click per Windows
-├── start.sh                   # Script di avvio per Linux / macOS
-└── README.md                  # Documentazione ufficiale
-```
-
----
-
-## 📄 Licenza
-
-Questo progetto è rilasciato sotto licenza Open Source **MIT**. Libero per uso personale, studio e modifiche.
+# 🎵 MusicDownloader - Docker App (100% Open Source)
+
+<p align="center">
+  <img src="assets/banner.svg" alt="MusicDownloader Banner" width="100%" />
+</p>
+
+<p align="center">
+  <strong>Applicazione Docker moderna, veloce e completamente Open Source per cercare, ascoltare in anteprima e scaricare musica e video da YouTube, YouTube Music e Spotify in massima qualità (MP3 320 kbps / Video MP4 HD & 4K).</strong>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white" />
+  <img src="https://img.shields.io/badge/CasaOS-Compatible-00D1B2?style=for-the-badge&logo=linux&logoColor=white" />
+  <img src="https://img.shields.io/badge/Python-3.11-3776AB?style=for-the-badge&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/FastAPI-0.110+-009688?style=for-the-badge&logo=fastapi&logoColor=white" />
+  <img src="https://img.shields.io/badge/FFmpeg-Included-007808?style=for-the-badge&logo=ffmpeg&logoColor=white" />
+  <img src="https://img.shields.io/badge/yt--dlp-Latest-FF0000?style=for-the-badge&logo=youtube&logoColor=white" />
+  <img src="https://img.shields.io/badge/Open%20Source-100%25-success?style=for-the-badge" />
+</p>
+
+---
+
+## 📸 Anteprima Interfaccia
+
+<p align="center">
+  <img src="assets/app-preview.svg" alt="MusicDownloader App Preview" width="100%" />
+</p>
+
+---
+
+## 🌟 Caratteristiche Principali
+
+- 🌐 **100% Open Source & Zero Dipendenze Esterne**: Non richiede account premium, chiavi API o login su servizi esterni. Tutto gira nel tuo container locale.
+- ⚡ **Ricerca Incrementale (Live Search)**:
+  - Inizia a cercare in tempo reale ad ogni tasto non appena scrivi **almeno 3 caratteri**.
+  - Debounce fluido di 320ms con annullamento intelligente delle chiamate superate (`AbortController`).
+  - Se cancelli il testo con la tastiera o premi la `✕`, l'app **torna automaticamente e fluidamente alla home dei brani popolari**.
+- 🔗 **Supporto Link Diretti**:
+  - Incolla direttamente link di **YouTube** (`https://youtube.com/watch?v=...`, `youtu.be`, YouTube Music).
+  - Incolla direttamente link di **Spotify** (`https://open.spotify.com/track/...`): i metadati del brano vengono risolti automaticamente in locale via oEmbed senza bisogno di token Spotify e associati alla corrispondenza migliore.
+- 🔥 **Classifiche e Canzoni Popolari in Tempo Reale**:
+  - Selettore istantaneo per nazione: 🇮🇹 **Italia**, 🌍 **Globale**, 🇺🇸 **USA**, 🇬🇧 **UK**, 🇪🇸 **Spagna**.
+  - Card moderne con copertina HD, titolo, artista, durata e badge di posizione (#1, #2, ...).
+- 📄 **Pagina Dettagli Canzone Completa & Player Multi-Mode Anti-VPN**:
+  - Copertina ad altissima risoluzione con bagliore atmosferico.
+  - Artista verificato, durata, visualizzazioni, data di uscita e album.
+  - **Player Multi-Mode con Protezione VPN**:
+    - **🎵 Audio Diretto (Zero Restrizioni VPN)**: streaming audio nativo HTML5 dal server con seek/scrubber interattivo, tempo trascorso e durata totale. Bypassa al 100% i blocchi di YouTube per utenti con VPN o brani protetti senza mostrare *"Guarda su YouTube"*.
+    - **🎬 Video YouTube**: embed ottimizzato con parametri di origine e policy corrette.
+    - **🛡️ Video Proxy (Anti-VPN)**: player alternativo Invidious per guardare il video liberamente anche se YouTube blocca l'IP della tua VPN.
+- ⏳ **Coda Sequenziale Automatica dei Download**:
+  - Se clicchi per scaricare un brano e subito dopo un video o un'altra canzone, il secondo viene inserito automaticamente in coda: **`⏳ In coda (Posizione #1)`**.
+  - Evita sovraccarichi di CPU e FFmpeg sul server/CasaOS e previene il blocco da parte dei browser mobile sui download automatici multipli contemporanei.
+  - **Avanzamento automatico**: non appena il download in corso termina e viene recapitato al browser, il successivo parte in automatico.
+  - Monitoraggio live con barra di avanzamento a strisce animate e pulsante per rimuovere elementi dalla coda (`⏹️ Rimuovi dalla Coda`).
+- 🎵 **Download Audio MP3 (Massima Qualità 320 kbps)**:
+  - Estrazione del flusso audio migliore disponibile.
+  - Conversione ad alta fedeltà a **320 kbps con FFmpeg**.
+  - **Copertina HD incorporata** direttamente nel file MP3 (tag ID3v2 APIC).
+  - **Tag ID3 completi** (Titolo, Artista, Album) per una visualizzazione perfetta su autoradio, iPhone, Android e lettori MP3.
+- 🎬 **Download Video MP4 con Rilevamento Intelligente del Videoclip Ufficiale**:
+  - Risolve il problema dei brani YouTube Music / Topic / Spotify: anziché scaricare un'immagine statica con audio, il motore **individua automaticamente il vero videoclip musicale ufficiale in HD / 4K**!
+  - Fusione con FFmpeg del flusso video a massima risoluzione (1080p, 1440p, 4K) e della traccia audio ad alta fedeltà.
+  - File MP4 universale compatibile con PC, Smart TV e smartphone.
+- 📥 **Pannello Globale Persistente dei Download (Drawer fluttuante)**:
+  - Tutti i download rimangono sempre visibili e monitorabili in tempo reale tramite un pratico cassetto fluttuante e un badge animato nella barra di navigazione.
+  - Puoi navigare tra le pagine, cercare altre canzoni o esplorare le classifiche: **i download continuano fluidamente in background senza interrompersi mai**.
+- ⏯️ **Controllo Totale del Download (Pausa, Ripresa, Annullamento & Pulizia)**:
+  - **Pausa**: sospendi qualsiasi download in corso salvaguardando i byte scaricati fino a quel momento.
+  - **Ripresa dal punto esatto**: riparti istantaneamente dal punto e byte in cui era stato interrotto senza riscaricare tutto da capo.
+  - **Annulla & Libera Memoria**: interrompe il processo e rimuove automaticamente i file temporanei `.part`, liberando subito memoria RAM e spazio disco.
+- 💻 **100% Salvataggio Diretto sul Client (Zero Memoria sul Server)**:
+  - I file scaricati (MP3 e MP4) vengono inviati **esclusivamente e direttamente al dispositivo** (PC, smartphone o tablet) che apre l'applicazione web.
+  - Il server converte i flussi al volo ed **elimina immediatamente qualsiasi file temporaneo** non appena il trasferimento verso il browser del client è completato.
+  - Nessun file musicale o video si accumula sul server o nel container Docker: massima privacy, zero spazio disco consumato su CasaOS o NAS!
+- 📥 **Gestore Unificato "I Miei Download" & Badge di Notifica**:
+  - Un'unica sezione intuitiva che mostra l'avanzamento dei download attivi, velocità (MB/s), tempo rimanente e stato di completamento.
+  - Download trigger automatico nel browser al 100% con notifica a comparsa.
+  - Badge dinamico nella barra di navigazione con conteggio live delle conversioni in corso.
+- 📱 **Ottimizzazione Mobile & UI Responsive (Touch-friendly)**:
+  - Layout moderno a **2 colonne** per smartphone con copertine 1:1, ispirato alla user-experience di Spotify e YouTube Music.
+  - **Zero icone o testi sovrapposti**: schede di download riorganizzate con etichette pulite e badge circolare compatto galleggiante nella barra di navigazione che non deforma la navbar su schermi piccoli.
+  - **Touch Friendly**: disattivato l'effetto hover sticky sulle copertine dei dispositivi touch, mantenendo le copertine nitide e i comandi immediatamente reattivi.
+  - Prevenzione automatica del fastidioso zoom su iOS Safari (`font-size: 16px` sul campo di ricerca).
+  - Chip dei suggerimenti e bandiere delle nazioni con scorrimento orizzontale tattile (`swipe`).
+  - Pulsanti con ampie aree di tocco touch (min. 44px) e supporto a notch e Safe Area (`viewport-fit=cover`).
+- 🔒 **Isolamento Multidispositivo Intelligente (Zero Re-Download Fantasma)**:
+  - Ogni client (PC, smartphone o tablet) riceve un identificatore univoco e gestisce **esclusivamente i download avviati da quel browser**.
+  - Aprendo il link dell'app da smartphone dopo aver scaricato musica dal computer, il telefono **non proverà mai a riscaricare brani o video scaricati in precedenza dal PC**.
+
+---
+
+## 📥 Guida al Download: Come Funziona Passo-Passo
+
+```mermaid
+flowchart TD
+    A[🔍 Scrivi 3 caratteri o incolla link YouTube/Spotify] --> B[⚡ Ricerca Incrementale Automatica]
+    B --> C[🎵 Seleziona il brano dall'elenco]
+    C --> D[📄 Pagina Dettagli + 🎧 Anteprima Ascolto]
+    D --> E{Cosa vuoi scaricare?}
+    E -->|🎵 Canzone Audio| F[Conversione al volo MP3 a 320kbps con FFmpeg + Tag ID3 e Cover]
+    E -->|🎬 Filmato Video| G[Fusione al volo Video HD/4K + Audio Hi-Fi in formato MP4]
+    F --> H[💻 Streaming Diretto nel Browser del Client]
+    G --> H
+    H --> I[💾 Salvataggio Automatico nei Download del tuo Dispositivo]
+    I --> J[🧹 Cancellazione Istantanea dal Server: 0 Byte rimasti!]
+```
+
+---
+
+## 🏠 Installazione e Avvio
+
+### 1. Installazione su CasaOS (Home Server / NAS) 🏠
+
+#### Metodo 1: Dall'interfaccia web di CasaOS (Consigliato - 1 Click)
+
+1. Nella dashboard di CasaOS, clicca sul pulsante **"+"** (in alto a destra nella sezione App) e seleziona **"Installa un'applicazione personalizzata"** (*Install a customized app*).
+2. In alto a destra della finestra, clicca sull'icona **"Importa"** (`</>` o icona file).
+3. Incolla il seguente codice Docker Compose completo:
+
+```yaml
+name: musicdownloader
+services:
+  musicdownloader:
+    image: ghcr.io/pitstop13/musicdownloader:latest
+    container_name: musicdownloader-app
+    ports:
+      - "8765:8765"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8765
+    restart: unless-stopped
+    x-casaos:
+      ports:
+        - container: "8765"
+          description:
+            en_us: Web UI port for MusicDownloader
+            it_it: Porta interfaccia Web MusicDownloader
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+    - arm
+  main: musicdownloader
+  description:
+    en_us: Modern web interface to search, preview, and download music (320kbps MP3 with embedded ID3 tags & cover art) and videos (HD/4K MP4) directly to the client browser. Zero server disk usage!
+    it_it: Interfaccia web moderna per cercare, ascoltare e scaricare musica (MP3 a 320 kbps con tag ID3 e copertina) e video (MP4 HD/4K) direttamente sul browser del tuo dispositivo. Zero spazio occupato sul server/NAS!
+  tagline:
+    en_us: Direct Client Music & Video Downloader
+    it_it: Downloader Diretto Musica & Video sul Client
+  developer: MusicDownloader
+  author: PitStop13
+  icon: https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
+  thumbnail: https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
+  title:
+    en_us: MusicDownloader
+    it_it: MusicDownloader
+  index: /
+  port_map: "8765"
+```
+
+4. Clicca su **"Invia"** (*Submit*). I parametri principali, l'icona ufficiale, il titolo e la porta risulteranno **già tutti precompilati automaticamente**.
+5. Clicca su **"Installa"** e attendi il download dell'immagine pubblicata da GitHub Container Registry.
+6. Apri MusicDownloader cliccando sulla sua icona o collegandoti a: 👉 **`http://<IP-DEL-TUO-SERVER>:8765`**
+
+#### Metodo 2: Da Terminale o SSH (Server / NAS)
+```bash
+cd /DATA/AppData
+git clone https://github.com/PitStop13/MusicDownloader.git
+cd MusicDownloader
+docker compose up -d
+```
+
+---
+
+### 2. Con 1 Click su Windows
+Fai doppio clic sul file:
+```cmd
+start.bat
+```
+Lo script si occuperà di:
+1. Verificare che Docker Desktop sia attivo (e avviarlo automaticamente se necessario);
+2. Costruire e avviare il container in background;
+3. Aprire il browser all'indirizzo **`http://localhost:8765`**.
+
+---
+
+### 3. Tramite Docker Compose (Windows / Mac / Linux)
+Nel terminale della cartella del progetto:
+
+```bash
+docker compose up --build -d
+```
+
+Apri il browser su:
+👉 **http://localhost:8765**
+
+Per fermare il container:
+```bash
+docker compose down
+```
+
+---
+
+### 4. Esecuzione Locale Senza Docker (Python)
+Se preferisci eseguire l'app direttamente in Python sul tuo computer:
+
+```bash
+# 1. Installa i requisiti
+pip install -r requirements.txt
+
+# 2. Avvia l'applicazione
+python run_local.py
+```
+*(Nota: per la conversione MP3 locale è consigliato avere `ffmpeg` installato nel PATH del sistema).*
+
+---
+
+## 🧪 Test Automatizzati
+
+Il progetto include una suite di test end-to-end che valida l'intero flusso dell'applicazione:
+
+```bash
+python tests/test_suite.py
+```
+
+La suite verifica automaticamente:
+1. ✅ Health check del backend (`/api/health`)
+2. ✅ Caricamento della Single Page App (`GET /`)
+3. ✅ Classifiche live Italia e Global (`/api/popular`)
+4. ✅ Ricerca incrementale con debounce (`/api/search`)
+5. ✅ Risoluzione automatica dei link Spotify oEmbed
+6. ✅ Estrazione dettagli e qualità video 4K / audio 320kbps
+7. ✅ Download MP3 a 320 kbps su client con verifica copertina ID3 e rimozione immediata dal server
+8. ✅ Download Video MP4 (4K/HD) su client con multiplexing FFmpeg e rimozione immediata dal server
+
+---
+
+## 🏗️ Architettura del Progetto
+
+```
+MusicDownloader/
+├── .github/
+│   └── workflows/
+│       └── docker-publish.yml # Build & pubblicazione automatica su GHCR (multi-arch amd64/arm64)
+├── app/
+│   ├── main.py                # Server FastAPI, endpoint REST e download stream
+│   ├── downloader.py          # Pipeline yt-dlp, conversione FFmpeg a 320kbps e ID3 tagging
+│   ├── music_service.py       # Classifiche YouTube Music live e risoluzione Spotify oEmbed
+│   ├── templates/
+│   │   └── index.html         # Single Page Application HTML5
+│   └── static/
+│       ├── css/
+│       │   └── style.css      # Tema scuro moderno Glassmorphism
+│       ├── js/
+│       │   └── app.js         # Logica client, ricerca incrementale, player e progress bar
+│       └── icons/
+│           ├── logo.png       # Icona ufficiale alta risoluzione
+│           └── logo.jpg
+├── assets/                    # Logo PNG, banner SVG e anteprime grafiche per CasaOS
+├── downloads/                 # Cartella volume montata sul tuo PC con i file scaricati
+├── tests/
+│   └── test_suite.py          # Suite di test automatizzati end-to-end (11 test)
+├── Dockerfile                 # Immagine Debian con Python 3.11, FFmpeg e Node.js
+├── docker-compose.yml         # Configurazione Docker Compose con schema x-casaos
+├── docker-compose.template.yml# Template CasaOS per installazione rapida con 1-click
+├── requirements.txt           # Dipendenze Python
+├── start.bat                  # Avvio con 1-click per Windows
+├── start.sh                   # Script di avvio per Linux / macOS
+└── README.md                  # Documentazione ufficiale
+```
+
+---
+
+## 📄 Licenza
+
+Questo progetto è rilasciato sotto licenza Open Source **MIT**. Libero per uso personale, studio e modifiche.

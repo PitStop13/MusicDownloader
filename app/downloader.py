@@ -29,6 +29,10 @@ class DownloadCancelledException(Exception):
 _TASKS: Dict[str, Dict[str, Any]] = {}
 _LOCK = threading.Lock()
 
+# Sequential Queue management: allows 1 active download/conversion at a time, queueing subsequent tasks
+_DOWNLOAD_QUEUE: List[str] = []
+_ACTIVE_RUNNING_TASK_ID: Optional[str] = None
+
 
 def serialize_task(task: Dict[str, Any]) -> Dict[str, Any]:
     """Return a JSON-serializable dictionary omitting threading objects."""
@@ -59,6 +63,17 @@ def get_all_tasks(client_id: Optional[str] = None) -> List[Dict[str, Any]]:
             tasks.append(serialize_task(t))
         tasks.sort(key=lambda x: x.get("created_at", 0), reverse=True)
         return tasks
+
+
+def _update_queue_positions_locked():
+    """Recalculate and update queue positions for all queued tasks."""
+    pos = 1
+    for tid in _DOWNLOAD_QUEUE:
+        t = _TASKS.get(tid)
+        if t and t.get("status") == "queued":
+            t["queue_position"] = pos
+            t["eta"] = f"In coda (#{pos})"
+            pos += 1
 
 
 def _update_task(task_id: str, **kwargs):
@@ -234,6 +249,48 @@ def _progress_hook(task_id: str):
     return hook
 
 
+def _process_next_in_queue_locked():
+    """Trigger the next task in queue when active task concludes."""
+    global _ACTIVE_RUNNING_TASK_ID
+    while _DOWNLOAD_QUEUE:
+        next_id = _DOWNLOAD_QUEUE.pop(0)
+        task = _TASKS.get(next_id)
+        if not task:
+            continue
+        # Skip if already cancelled or errored
+        if task.get("status") in ("cancelled", "error", "finished"):
+            continue
+
+        _ACTIVE_RUNNING_TASK_ID = next_id
+        task["status"] = "starting"
+        task["progress"] = 5.0
+        task["speed"] = ""
+        task["eta"] = "Avvio elaborazione..."
+        task["queue_position"] = 0
+        _update_queue_positions_locked()
+
+        thread = threading.Thread(
+            target=_run_download_thread,
+            args=(
+                next_id,
+                task["url_or_id"],
+                task["format"],
+                task.get("title"),
+                task.get("artist"),
+                task.get("thumbnail_url"),
+                task.get("official_video_id"),
+                False
+            ),
+            daemon=True
+        )
+        task["thread"] = thread
+        thread.start()
+        print(f"[Sequential Queue] Avviato prossimo download in coda: Task {next_id} ('{task.get('title')}')")
+        return
+
+    _ACTIVE_RUNNING_TASK_ID = None
+
+
 def _run_download_thread(
     task_id: str,
     video_id_or_url: str,
@@ -244,36 +301,36 @@ def _run_download_thread(
     official_video_id: Optional[str] = None,
     is_resume: bool = False
 ):
-    """Background worker for yt-dlp execution with pause/resume and video resolution."""
+    """Background worker for yt-dlp execution with queue integration, pause/resume and video resolution."""
     from app.music_service import find_official_music_video, is_art_track_info
 
     target_id_or_url = video_id_or_url
 
-    # When downloading video (MP4), verify if we should fetch the official music video
-    if output_format == "mp4":
-        if official_video_id:
-            target_id_or_url = official_video_id
-            _update_task(task_id, is_official_clip=True)
-        else:
-            try:
-                ydl_check_opts = {'quiet': True, 'skip_download': True}
-                check_url = target_id_or_url if target_id_or_url.startswith("http") else f"https://www.youtube.com/watch?v={target_id_or_url}"
-                with yt_dlp.YoutubeDL(ydl_check_opts) as ydl_check:
-                    c_info = ydl_check.extract_info(check_url, download=False)
-                    if c_info and is_art_track_info(c_info):
-                        c_title = custom_title or c_info.get('title', '')
-                        c_artist = custom_artist or c_info.get('artist') or c_info.get('uploader') or ''
-                        c_uploader = c_info.get('uploader')
-                        off_v = find_official_music_video(c_title, c_artist, c_uploader)
-                        if off_v and off_v.get("id"):
-                            target_id_or_url = off_v["id"]
-                            _update_task(task_id, is_official_clip=True, official_clip_title=off_v.get("title"))
-            except Exception as e:
-                print(f"[Warning] Failed to pre-check official video: {e}")
-
-    url = target_id_or_url if target_id_or_url.startswith("http") else f"https://www.youtube.com/watch?v={target_id_or_url}"
-
     try:
+        # When downloading video (MP4), verify if we should fetch the official music video
+        if output_format == "mp4":
+            if official_video_id:
+                target_id_or_url = official_video_id
+                _update_task(task_id, is_official_clip=True)
+            else:
+                try:
+                    ydl_check_opts = {'quiet': True, 'skip_download': True}
+                    check_url = target_id_or_url if target_id_or_url.startswith("http") else f"https://www.youtube.com/watch?v={target_id_or_url}"
+                    with yt_dlp.YoutubeDL(ydl_check_opts) as ydl_check:
+                        c_info = ydl_check.extract_info(check_url, download=False)
+                        if c_info and is_art_track_info(c_info):
+                            c_title = custom_title or c_info.get('title', '')
+                            c_artist = custom_artist or c_info.get('artist') or c_info.get('uploader') or ''
+                            c_uploader = c_info.get('uploader')
+                            off_v = find_official_music_video(c_title, c_artist, c_uploader)
+                            if off_v and off_v.get("id"):
+                                target_id_or_url = off_v["id"]
+                                _update_task(task_id, is_official_clip=True, official_clip_title=off_v.get("title"))
+                except Exception as e:
+                    print(f"[Warning] Failed to pre-check official video: {e}")
+
+        url = target_id_or_url if target_id_or_url.startswith("http") else f"https://www.youtube.com/watch?v={target_id_or_url}"
+
         out_template = os.path.join(TEMP_DIR, "%(title)s.%(ext)s")
         hook = _progress_hook(task_id)
 
@@ -321,7 +378,8 @@ def _run_download_thread(
             status="downloading" if is_resume else "starting",
             progress=5.0 if not is_resume else None,
             speed="" if not is_resume else "Ripresa download...",
-            effective_url=url
+            effective_url=url,
+            queue_position=0
         )
 
         with _LOCK:
@@ -377,19 +435,20 @@ def _run_download_thread(
                 completed_at=time.time(),
                 download_url=f"/api/download/file/{task_id}",
                 speed="",
-                eta=""
+                eta="",
+                queue_position=0
             )
 
     except DownloadPausedException:
         print(f"[Task {task_id}] In pausa su richiesta dell'utente.")
-        _update_task(task_id, status="paused", speed="", eta="")
+        _update_task(task_id, status="paused", speed="", eta="", queue_position=0)
     except DownloadCancelledException:
         print(f"[Task {task_id}] Annullato su richiesta dell'utente.")
         with _LOCK:
             task = _TASKS.get(task_id)
         if task:
             _cleanup_partial_files(task)
-        _update_task(task_id, status="cancelled", progress=0.0, speed="", eta="")
+        _update_task(task_id, status="cancelled", progress=0.0, speed="", eta="", queue_position=0)
     except Exception as e:
         print(f"[Download Error on task {task_id}] {e}")
         _update_task(
@@ -398,8 +457,16 @@ def _run_download_thread(
             error=str(e),
             progress=0.0,
             speed="",
-            eta=""
+            eta="",
+            queue_position=0
         )
+    finally:
+        # Crucial for Queue System: release active worker and process next task in queue
+        with _LOCK:
+            global _ACTIVE_RUNNING_TASK_ID
+            if _ACTIVE_RUNNING_TASK_ID == task_id:
+                _ACTIVE_RUNNING_TASK_ID = None
+                _process_next_in_queue_locked()
 
 
 def start_download_task(
@@ -411,7 +478,11 @@ def start_download_task(
     official_video_id: Optional[str] = None,
     client_id: Optional[str] = None
 ) -> str:
-    """Initiate an asynchronous download task with pause/resume/cancel tracking."""
+    """
+    Initiate or enqueue a download task.
+    If another download is active, automatically queues this task sequentially.
+    """
+    global _ACTIVE_RUNNING_TASK_ID
     task_id = str(uuid.uuid4())
     fmt = "mp3" if output_format.lower() == "mp3" else "mp4"
 
@@ -432,6 +503,7 @@ def start_download_task(
         "progress": 0.0,
         "speed": "",
         "eta": "",
+        "queue_position": 0,
         "filename": None,
         "filepath": None,
         "download_url": None,
@@ -446,35 +518,66 @@ def start_download_task(
 
     with _LOCK:
         _TASKS[task_id] = task_data
+        
+        # Check if worker is currently busy
+        active_task = _TASKS.get(_ACTIVE_RUNNING_TASK_ID) if _ACTIVE_RUNNING_TASK_ID else None
+        is_busy = active_task and active_task.get("status") in ("starting", "downloading", "converting", "tagging")
 
-    thread = threading.Thread(
-        target=_run_download_thread,
-        args=(task_id, video_id_or_url, fmt, title, artist, thumbnail_url, official_video_id, False),
-        daemon=True
-    )
-    task_data["thread"] = thread
-    thread.start()
+        if not is_busy:
+            _ACTIVE_RUNNING_TASK_ID = task_id
+            task_data["status"] = "starting"
+            task_data["progress"] = 5.0
+            task_data["eta"] = "Avvio elaborazione..."
+            
+            thread = threading.Thread(
+                target=_run_download_thread,
+                args=(task_id, video_id_or_url, fmt, title, artist, thumbnail_url, official_video_id, False),
+                daemon=True
+            )
+            task_data["thread"] = thread
+            thread.start()
+            print(f"[Sequential Queue] Avvio immediato Task {task_id} ('{task_data['title']}').")
+        else:
+            # Add to sequential queue
+            _DOWNLOAD_QUEUE.append(task_id)
+            task_data["status"] = "queued"
+            _update_queue_positions_locked()
+            print(f"[Sequential Queue] Task {task_id} ('{task_data['title']}') aggiunto in coda alla posizione #{task_data['queue_position']}.")
 
     return task_id
 
 
 def pause_download_task(task_id: str) -> bool:
-    """Pause an active download task."""
+    """Pause an active download task or a queued download task."""
+    global _ACTIVE_RUNNING_TASK_ID
     with _LOCK:
         task = _TASKS.get(task_id)
         if not task:
             return False
+        
         if task["status"] in ("downloading", "starting", "pending"):
             task["pause_event"].set()
             task["status"] = "paused"
             task["speed"] = ""
-            task["eta"] = ""
+            task["eta"] = "In pausa"
+            if _ACTIVE_RUNNING_TASK_ID == task_id:
+                _ACTIVE_RUNNING_TASK_ID = None
+                # Advance queue so other tasks don't get blocked
+                _process_next_in_queue_locked()
+            return True
+        elif task["status"] == "queued":
+            task["status"] = "paused"
+            task["eta"] = "In pausa"
+            if task_id in _DOWNLOAD_QUEUE:
+                _DOWNLOAD_QUEUE.remove(task_id)
+                _update_queue_positions_locked()
             return True
     return False
 
 
 def resume_download_task(task_id: str) -> bool:
-    """Resume a paused download task from where it was interrupted."""
+    """Resume a paused download task (immediately if idle, or places in queue)."""
+    global _ACTIVE_RUNNING_TASK_ID
     with _LOCK:
         task = _TASKS.get(task_id)
         if not task or task["status"] != "paused":
@@ -482,31 +585,44 @@ def resume_download_task(task_id: str) -> bool:
 
         task["pause_event"].clear()
         task["cancel_event"].clear()
-        task["status"] = "downloading"
-        task["speed"] = "Ripresa..."
         task["error"] = None
 
-        thread = threading.Thread(
-            target=_run_download_thread,
-            args=(
-                task_id,
-                task["url_or_id"],
-                task["format"],
-                task.get("title"),
-                task.get("artist"),
-                task.get("thumbnail_url"),
-                task.get("official_video_id"),
-                True
-            ),
-            daemon=True
-        )
-        task["thread"] = thread
-        thread.start()
+        active_task = _TASKS.get(_ACTIVE_RUNNING_TASK_ID) if _ACTIVE_RUNNING_TASK_ID else None
+        is_busy = active_task and active_task.get("status") in ("starting", "downloading", "converting", "tagging")
+
+        if not is_busy:
+            _ACTIVE_RUNNING_TASK_ID = task_id
+            task["status"] = "downloading"
+            task["speed"] = "Ripresa..."
+            task["queue_position"] = 0
+            
+            thread = threading.Thread(
+                target=_run_download_thread,
+                args=(
+                    task_id,
+                    task["url_or_id"],
+                    task["format"],
+                    task.get("title"),
+                    task.get("artist"),
+                    task.get("thumbnail_url"),
+                    task.get("official_video_id"),
+                    True
+                ),
+                daemon=True
+            )
+            task["thread"] = thread
+            thread.start()
+        else:
+            task["status"] = "queued"
+            _DOWNLOAD_QUEUE.append(task_id)
+            _update_queue_positions_locked()
+
         return True
 
 
 def cancel_download_task(task_id: str) -> bool:
-    """Cancel an active or paused download task and clean up partial files."""
+    """Cancel an active or queued download task and clean up partial files."""
+    global _ACTIVE_RUNNING_TASK_ID
     with _LOCK:
         task = _TASKS.get(task_id)
         if not task:
@@ -516,21 +632,39 @@ def cancel_download_task(task_id: str) -> bool:
         task["status"] = "cancelled"
         task["progress"] = 0.0
         task["speed"] = ""
-        task["eta"] = ""
+        task["eta"] = "Annullato"
+        task["queue_position"] = 0
+
+        if task_id in _DOWNLOAD_QUEUE:
+            _DOWNLOAD_QUEUE.remove(task_id)
+            _update_queue_positions_locked()
+
+        if _ACTIVE_RUNNING_TASK_ID == task_id:
+            _ACTIVE_RUNNING_TASK_ID = None
+            _process_next_in_queue_locked()
 
     _cleanup_partial_files(task)
     return True
 
 
 def delete_task(task_id: str) -> bool:
-    """Cancel if running and remove task from in-memory tracking list."""
+    """Cancel if running, remove from queue, and remove task from in-memory tracking list."""
+    global _ACTIVE_RUNNING_TASK_ID
     with _LOCK:
+        if task_id in _DOWNLOAD_QUEUE:
+            _DOWNLOAD_QUEUE.remove(task_id)
+            _update_queue_positions_locked()
+
         task = _TASKS.pop(task_id, None)
         if not task:
             return False
 
         if task.get("status") in ("downloading", "starting", "paused"):
             task["cancel_event"].set()
+
+        if _ACTIVE_RUNNING_TASK_ID == task_id:
+            _ACTIVE_RUNNING_TASK_ID = None
+            _process_next_in_queue_locked()
 
     _cleanup_partial_files(task)
     return True
