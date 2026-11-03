@@ -37,8 +37,8 @@ x-casaos:
     it_it: Downloader Musica & Video
   developer: MusicDownloader
   author: PitStop13
-  icon: https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
-  thumbnail: https://raw.githubusercontent.com/PitStop13/MusicDownloader/main/assets/logo.png
+  icon: https://raw.githubusercontent.com/PitStop13/MusicDownloader/master/assets/logo.png
+  thumbnail: https://raw.githubusercontent.com/PitStop13/MusicDownloader/master/assets/logo.png
   title:
     en_us: MusicDownloader
     it_it: MusicDownloader
